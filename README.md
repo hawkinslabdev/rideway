@@ -1,67 +1,99 @@
-# Rideway - Motorcycle Maintenance Tracker
+# 🏍️ Rideway - Keep Your Bikes Running Smooth
 
-Rideway is a web application designed to help motorcycle enthusiasts track and manage their bike maintenance with ease. Whether you own one motorcycle or several, Rideway helps you stay on top of maintenance schedules, service history, and associated costs.
+Hey fellow riders! Rideway is your digital garage buddy that helps you stay on top of maintenance for all your motorcycles. Whether you're wrenching on a vintage café racer or maintaining a fleet of modern sport bikes, Rideway's got your back.
 
-## Features
+## Why Rideway?
 
-- **Garage Management** - Track multiple motorcycles with complete details including make, model, year, mileage, and photos
-- **Maintenance Scheduling** - Set up recurring maintenance tasks based on mileage or time intervals  
-- **Service History** - Keep detailed records of all maintenance performed, including costs and receipts
-- **Dashboard** - Quick overview of upcoming maintenance tasks and overdue items
-- **Data Export/Import** - Backup your data as JSON and restore it across devices
-- **Cost Tracking** - Monitor maintenance expenses with visual charts and reports
+Ever forgot when you last changed your oil? Lost track of maintenance receipts? Wondered if those fork seals are due for service? Rideway solves all that with:
 
-## Tech Stack
+- **🔧 Smart Maintenance Tracking** - Set it once, and get reminded based on miles or time
+- **📝 Complete Service History** - Every oil change, valve adjustment, and tire swap in one place
+- **💰 Cost Management** - Know exactly what you're spending on each bike
+- **📊 Visual Dashboard** - See what's due at a glance with color-coded priorities
+- **💾 Data Backup** - Export everything as JSON and never lose your records
+- **📱 Mobile Friendly** - Check your maintenance schedule from the garage or on the road
 
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **UI Library**: React
-- **Styling**: Tailwind CSS
-- **Database**: SQLite  
-- **ORM**: Drizzle ORM
-- **Authentication**: NextAuth.js
-- **Charts**: Chart.js with react-chartjs-2
-- **Date Handling**: date-fns
+## Built for Riders, by Riders
 
-## Getting Started
+We use modern web tech that just works:
+- Next.js 15 with TypeScript for speed and reliability
+- SQLite database - your data stays on your machine
+- Clean, responsive design with Tailwind CSS
+- Secure authentication to keep your garage private
+- Charts and graphs to visualize your maintenance costs
 
-1. Clone the repository
-2. Install dependencies:
+## Get Started in 5 Minutes
+
+For now, you'll have to rely on using your own skills to set-up a server with the following commands. We're working on a Docker container. 
+
+1. **Clone the repo**
+   ```bash
+   git clone [repository-url]
+   cd rideway
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. Run database migrations:
+3. **Set up your database**
    ```bash
    npm run db:generate
    npm run db:migrate
    ```
 
-4. Start the development server:
+4. **Fire it up**
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. **Open your browser**
+   Visit [http://localhost:3000](http://localhost:3000)
 
-The application will guide you through an initial setup process to create your account and add your first motorcycle.
+The setup wizard will walk you through creating your account and adding your first bike.
 
-## Key Features
+## Features That Matter
 
-### For Riders
-- Receive timely maintenance reminders based on mileage or time intervals
-- View comprehensive service history with easy filtering and search
-- Export your complete garage data as a backup
+### For Weekend Warriors
+- Get maintenance reminders before that big ride
+- Track multiple bikes with different service schedules  
+- Store photos of your bikes and maintenance work
+- Quick mileage updates after each ride
 
-### For DIY Mechanics  
-- Track maintenance costs and compare across different motorcycles
-- Store notes and photos for each maintenance record
-- Create custom maintenance schedules for unique requirements
+### For DIY Mechanics
+- Create custom maintenance schedules for modified bikes
+- Keep detailed notes on parts used and procedures followed
+- Track costs to budget for future maintenance
+- Store digital copies of receipts and invoices
+
+### For Multi-Bike Owners
+- Manage your entire fleet from one dashboard
+- Compare maintenance costs across different bikes
+- Export/import data to share between devices
+- Set priority levels for urgent maintenance tasks
+
+## Your Data, Your Control
+
+- All data stored locally in SQLite
+- Export your complete garage anytime as JSON
+- Import your data on any device running Rideway
+- No cloud subscriptions or vendor lock-in
 
 ## Contributing
 
-Contributions are welcome! Feel free to submit issues and pull requests.
+Got ideas? Found a bug? PRs are welcome! This is open source software built by riders for riders.
+
+## Support
+
+- Create an issue for bug reports
+- Start a discussion for feature requests
+- Check the wiki for common questions
 
 ## License
 
-This project is open source and available under the MIT License.
+MIT License - Use it, modify it, share it!
+
+---
+
+*Keep the rubber side down! 🏍️*
