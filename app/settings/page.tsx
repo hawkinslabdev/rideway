@@ -1,19 +1,24 @@
 // app/settings/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import ClientLayout from "../components/ClientLayout";
-import { Bell, Globe, Eye, Save, AlertCircle, Check, Trash2 } from "lucide-react";
+import { Bell, Globe, Eye, Save, AlertCircle, Check, Trash2, Download, Upload, Database, AlertTriangle } from "lucide-react";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [importConfirmModal, setImportConfirmModal] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [importConfirmText, setImportConfirmText] = useState("");
   
   const [settings, setSettings] = useState({
     emailNotifications: true,
@@ -22,6 +27,12 @@ export default function SettingsPage() {
     language: "en",
     theme: "light",
   });
+
+  useEffect(() => {
+    if (!session) {
+      router.push("/auth/signin");
+    }
+  }, [session, router]);
 
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
@@ -49,9 +60,93 @@ export default function SettingsPage() {
     }
   };
 
+  const handleExportDatabase = async () => {
+    try {
+      const response = await fetch("/api/user/export");
+      if (!response.ok) throw new Error("Export failed");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rideway-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export failed:", error);
+      setError("Failed to export data. Please try again.");
+    }
+  };
+
+  const handleImportFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Store the file and show the confirmation modal
+    setPendingImportFile(file);
+    setImportConfirmModal(true);
+    // Reset the file input
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleImportDatabase = async () => {
+    if (!pendingImportFile) return;
+
+    // Check if user needs to confirm with their email
+    if (session?.user?.email) {
+      if (importConfirmText !== session.user.email) {
+        setError("The email address doesn't match. Please type your email correctly.");
+        return;
+      }
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess(false);
+    setImportConfirmModal(false);
+
+    try {
+      const fileContent = await pendingImportFile.text();
+      const data = JSON.parse(fileContent);
+
+      const response = await fetch("/api/user/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Import failed");
+      }
+
+      const result = await response.json();
+      setSuccess(true);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error("Import failed:", error);
+      setError("Failed to import data. Please make sure the file is valid.");
+    } finally {
+      setLoading(false);
+      setPendingImportFile(null);
+      setImportConfirmText("");
+    }
+  };
+
   const handleDeleteAccount = async () => {
-    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-      return;
+    // Check if user has confirmed with their email
+    if (session?.user?.email) {
+      if (deleteConfirmText !== session.user.email) {
+        setError("The email address doesn't match. Please type your email correctly.");
+        return;
+      }
     }
 
     try {
@@ -70,12 +165,14 @@ export default function SettingsPage() {
     }
     
     setDeleteAccountModal(false);
+    setDeleteConfirmText("");
   };
 
   if (!session) {
-    router.push("/auth/signin");
     return null;
   }
+
+  const userIdentifier = session.user?.email || session.user?.name || "your account";
 
   return (
     <ClientLayout>
@@ -83,7 +180,7 @@ export default function SettingsPage() {
         <div className="max-w-3xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold">Settings</h1>
-            <p className="text-gray-600">Manage your application preferences</p>
+            <p className="text-gray-600">Manage your application preferences and data</p>
           </div>
 
           <div className="space-y-6">
@@ -205,15 +302,42 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Danger Zone */}
-            <div className="bg-white shadow rounded-lg p-6 border-2 border-red-200">
-              <h2 className="text-lg font-semibold mb-4 text-red-600 flex items-center">
-                <AlertCircle className="mr-2" size={20} />
-                Danger Zone
+            {/* Data Management */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center">
+                <Database className="mr-2" size={20} />
+                Data Management
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700">Delete Account</h3>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Backup & Restore</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Export your data to create a backup or import data from a previous backup.
+                  </p>
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={handleExportDatabase}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <Download size={16} className="mr-2" />
+                      Export Data
+                    </button>
+                    <label className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
+                      <Upload size={16} className="mr-2" />
+                      Import Data
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={handleImportFileSelect}
+                      />
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-medium text-red-600 mb-2">Delete Account</h3>
                   <p className="text-sm text-gray-500 mb-4">
                     Permanently delete your account and all associated data. This action cannot be undone.
                   </p>
@@ -246,22 +370,91 @@ export default function SettingsPage() {
         {deleteAccountModal && (
           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Account</h3>
+              <div className="flex items-center mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Delete Account</h3>
+              </div>
               <p className="text-sm text-gray-500 mb-4">
-                Are you sure you want to delete your account? All of your data will be permanently removed. This action cannot be undone.
+                This will permanently delete your account and all associated data. This action cannot be undone.
               </p>
+              {session.user?.email && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Type <span className="font-semibold">{session.user.email}</span> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Enter your email address"
+                  />
+                </div>
+              )}
               <div className="flex justify-end space-x-4">
                 <button
-                  onClick={() => setDeleteAccountModal(false)}
+                  onClick={() => {
+                    setDeleteAccountModal(false);
+                    setDeleteConfirmText("");
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteAccount}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  disabled={session.user?.email ? deleteConfirmText !== session.user.email : false}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Import Confirmation Modal */}
+        {importConfirmModal && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex items-center mb-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-600 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Import Data</h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                This will import data from the selected file. Existing data may be overwritten or duplicated. This action cannot be undone.
+              </p>
+              {session.user?.email && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Type <span className="font-semibold">{session.user.email}</span> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={importConfirmText}
+                    onChange={(e) => setImportConfirmText(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Enter your email address"
+                  />
+                </div>
+              )}
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={() => {
+                    setImportConfirmModal(false);
+                    setImportConfirmText("");
+                    setPendingImportFile(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportDatabase}
+                  disabled={session.user?.email ? importConfirmText !== session.user.email : false}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Import Data
                 </button>
               </div>
             </div>

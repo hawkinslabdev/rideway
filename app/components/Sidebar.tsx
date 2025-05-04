@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef } from "react";
 import { Bike, Calendar, Wrench, History, Settings, User, LogOut, Download, Upload, ChevronDown, ChevronUp } from "lucide-react";
@@ -112,75 +113,54 @@ export default function Sidebar() {
       <div className="border-t border-gray-700">
         {session?.user ? (
           <div className="p-4">
-        <button
-          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
-        >
-          <div className="flex items-center">
-            <User size={18} className="mr-3" />
-            <span className="truncate">{session.user.name || session.user.email}</span>
-          </div>
-          {isUserMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
-        
-        {isUserMenuOpen && (
-          <div className="mt-2 space-y-1">
-            <Link
-          href="/profile"
-          className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
-            >
-          <User size={16} className="mr-3" />
-          Profile
-            </Link>
             <button
-          onClick={handleExportDatabase}
-          className="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
             >
-          <Download size={16} className="mr-3" />
-          Export Data
+              <div className="flex items-center">
+                <User size={18} className="mr-3" />
+                <span className="truncate">{session.user.name || session.user.email}</span>
+              </div>
+              {isUserMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
-            <label className="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md cursor-pointer">
-          <Upload size={16} className="mr-3" />
-          Import Data
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleImportDatabase}
-          />
-            </label>
-            <button
-          onClick={handleSignOut}
-          className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-md"
-            >
-          <LogOut size={16} className="mr-3" />
-          Sign Out
-            </button>
-          </div>
-        )}
+            
+            {isUserMenuOpen && (
+              <div className="mt-2 space-y-1">
+                <Link
+                  href="/profile"
+                  className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
+                >
+                  <User size={16} className="mr-3" />
+                  Profile
+                </Link>
+                <Link
+                  href="/settings"
+                  className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
+                >
+                  <Settings size={16} className="mr-3" />
+                  Settings
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-md"
+                >
+                  <LogOut size={16} className="mr-3" />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="p-4">
-        <Link
-          href="/auth/signin"
-          className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
-        >
-          <LogOut size={18} className="mr-3" />
-          Sign In
-        </Link>
+            <Link
+              href="/auth/signin"
+              className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
+            >
+              <LogOut size={18} className="mr-3" />
+              Sign In
+            </Link>
           </div>
         )}
-        
-        <div className="p-4">
-          <Link
-        href="/settings"
-        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
-          >
-        <Settings size={18} className="mr-3" />
-        Settings
-          </Link>
-        </div>
       </div>
     </div>
   );

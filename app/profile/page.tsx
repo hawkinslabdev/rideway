@@ -1,11 +1,11 @@
 // app/profile/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import ClientLayout from "../components/ClientLayout";
-import { User, Mail, Save, AlertCircle, Check, Download, Upload } from "lucide-react";
+import { User, Mail, Save, AlertCircle, Check } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session, update } = useSession();
@@ -123,7 +123,7 @@ export default function ProfilePage() {
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-3xl mx-auto">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold">Profile Settings</h1>
+            <h1 className="text-2xl font-bold">Profile</h1>
             <p className="text-gray-600">Manage your account information and password</p>
           </div>
 
