@@ -14,7 +14,7 @@ Hey fellow riders! Rideway is your digital garage buddy that helps you stay on t
 
 Ever forgot when you last changed your oil? Lost track of maintenance receipts? Wondered if those fork seals are due for service? Rideway solves all that with:
 
-- **🔧 Smart Maintenance Tracking** - Set it once, and get reminded based on miles or time
+- **🔧 Maintenance Tracking** - Set it once, and get reminded based on miles or time
 - **📝 Complete Service History** - Every oil change, valve adjustment, and tire swap in one place
 - **💰 Cost Management** - Know exactly what you're spending on each bike
 - **📊 Visual Dashboard** - See what's due at a glance with color-coded priorities
