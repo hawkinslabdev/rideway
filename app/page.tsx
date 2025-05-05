@@ -343,6 +343,11 @@ export default function Home() {
                     </td>
                     <td className="px-6 py-4">
                       {task.dueMileage ? formatDistance(task.dueMileage) : "N/A"}
+                      {task.currentMileage && task.dueMileage && (
+                        task.currentMileage < task.dueMileage ? 
+                          ` (${formatDistance(task.dueMileage - task.currentMileage)} left)` : 
+                          ` (${formatDistance(task.currentMileage - task.dueMileage)} overdue)`
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span

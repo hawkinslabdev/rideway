@@ -393,9 +393,11 @@ export default function MaintenancePage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {task.dueMileage ? formatDistance(task.dueMileage) : "N/A"}
-                          {task.currentMileage && task.dueMileage ? 
-                            ` (${formatDistance(task.dueMileage - task.currentMileage)} left)` : 
-                            ""}
+                          {task.currentMileage && task.dueMileage ? (
+                            task.currentMileage < task.dueMileage ? 
+                              ` (${formatDistance(task.dueMileage - task.currentMileage)} left)` : 
+                              ` (${formatDistance(task.currentMileage - task.dueMileage)} overdue)`
+                          ) : ""}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { config, UnitsType, ThemeType, getUnitsLabel, convertDistance, formatDistance } from '../lib/config';
+import { DistanceUtil } from '../lib/utils/distance';
 
 // Define the shape of our settings
 export interface AppSettings {
@@ -21,6 +22,9 @@ interface SettingsContextType {
   getUnitsLabel: () => { distance: string, volume: string };
   convertDistance: (value: number, from: UnitsType) => number;
   formatDistance: (value: number, decimals?: number) => string;
+  // Add these two new properties:
+  convertToDisplayUnits: (valueInKm: number | null | undefined, decimals?: number) => number | null;
+  convertToStorageUnits: (displayValue: number | null | undefined, decimals?: number) => number | null;
 }
 
 // Create the context with a default value
@@ -112,8 +116,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Format a distance value with the current units
-  const formatCurrentDistance = (value: number, decimals = 0): string => {
-    return formatDistance(value, settings.units, decimals);
+  const formatCurrentDistance = (value: number | null | undefined, decimals = 0): string => {
+    return DistanceUtil.format(value, settings.units, decimals);
+  };
+  
+  // Convert a value from storage units (km) to display units
+  const convertToDisplayUnits = (valueInKm: number | null | undefined, decimals = 0): number | null => {
+    return DistanceUtil.toDisplayUnits(valueInKm, settings.units, decimals);
+  };
+  
+  // Convert a value from display units to storage units (km)
+  const convertToStorageUnits = (displayValue: number | null | undefined, decimals = 0): number | null => {
+    return DistanceUtil.toStorageUnits(displayValue, settings.units, decimals);
   };
 
   // Only render children once settings are loaded from localStorage
@@ -129,7 +143,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         saveSettings,
         getUnitsLabel: getCurrentUnitsLabel,
         convertDistance: convertToCurrentUnits,
-        formatDistance: formatCurrentDistance
+        formatDistance: formatCurrentDistance,
+        convertToDisplayUnits,
+        convertToStorageUnits
       }}
     >
       {children}

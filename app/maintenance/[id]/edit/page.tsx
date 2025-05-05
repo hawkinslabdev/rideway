@@ -6,6 +6,7 @@ import ClientLayout from "../../../components/ClientLayout";
 import Link from "next/link";
 import { ArrowLeft, Save, AlertCircle } from "lucide-react";
 import { useSettings } from "../../../contexts/SettingsContext";
+import { DistanceUtil } from "../../../lib/utils/distance"; // Import this
 
 interface MaintenanceTask {
   id: string;
@@ -33,7 +34,13 @@ interface Motorcycle {
 export default function EditMaintenanceTaskPage() {
   const params = useParams();
   const router = useRouter();
-  const { settings, convertDistance, getUnitsLabel } = useSettings();
+  const { 
+    settings, 
+    getUnitsLabel, 
+    convertToDisplayUnits,
+    convertToStorageUnits 
+  } = useSettings();
+  
   const unitLabel = getUnitsLabel().distance;
   
   const [isLoading, setIsLoading] = useState(true);
@@ -52,8 +59,7 @@ export default function EditMaintenanceTaskPage() {
     isRecurring: true,
   });
 
-  // In the useEffect hook where the task data is fetched
-useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       if (!params.id) return;
       
@@ -78,24 +84,17 @@ useEffect(() => {
         const taskData = await taskResponse.json();
         setTask(taskData);
         
-        // FIXED: Get interval miles directly from the database without conversion
-        // The data is stored in miles in the database
-        let displayIntervalMiles = taskData.intervalMiles ? taskData.intervalMiles.toString() : "";
-        
-        // FIXED: Only convert if user's preference is metric (km)
-        if (settings.units === 'metric' && displayIntervalMiles) {
-          // Convert from miles to kilometers
-          const mileageValue = parseFloat(displayIntervalMiles);
-          const kmValue = Math.round(mileageValue * 1.60934); // miles to km, rounded to nearest whole number
-          displayIntervalMiles = kmValue.toString();
-        }
-        
+        // FIXED: Use the utility function to properly convert for display
+        // The database stores in kilometers, so we use our utility to convert if needed
+        const displayIntervalMiles = taskData.intervalMiles ? 
+          convertToDisplayUnits(taskData.intervalMiles) : null;
+
         // Update form data
         setFormData({
           motorcycleId: taskData.motorcycleId,
           name: taskData.name,
           description: taskData.description || "",
-          intervalMiles: displayIntervalMiles,
+          intervalMiles: displayIntervalMiles ? displayIntervalMiles.toString() : "",
           intervalDays: taskData.intervalDays ? taskData.intervalDays.toString() : "",
           priority: taskData.priority || "medium",
           isRecurring: taskData.isRecurring !== false,  // Default to true if not specified
@@ -108,7 +107,7 @@ useEffect(() => {
     };
     
     fetchData();
-  }, [params.id, settings.units]);
+  }, [params.id, settings.units, convertToDisplayUnits]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -148,14 +147,9 @@ useEffect(() => {
     setError(null);
     
     try {
-      // FIXED: Convert intervalMiles from current units to miles for storage if needed
-      let intervalMilesInMiles = formData.intervalMiles;
-      if (settings.units === 'metric' && formData.intervalMiles) {
-        // Convert from kilometers to miles
-        const kmValue = parseFloat(formData.intervalMiles);
-        const milesValue = Math.round(kmValue * 0.621371); // km to miles, rounded to nearest whole number
-        intervalMilesInMiles = milesValue.toString();
-      }
+      // FIXED: Use the utility function to convert display units to storage units
+      const intervalMilesValue = DistanceUtil.parseInput(formData.intervalMiles);
+      const intervalMilesInKm = convertToStorageUnits(intervalMilesValue);
       
       const response = await fetch(`/api/maintenance/task/${params.id}`, {
         method: "PATCH",
@@ -166,7 +160,7 @@ useEffect(() => {
           motorcycleId: formData.motorcycleId,
           name: formData.name,
           description: formData.description || null,
-          intervalMiles: intervalMilesInMiles ? parseInt(intervalMilesInMiles) : null,
+          intervalMiles: intervalMilesInKm, // Now properly converted to KM for storage
           intervalDays: formData.intervalDays ? parseInt(formData.intervalDays) : null,
           priority: formData.priority,
           isRecurring: formData.isRecurring,
