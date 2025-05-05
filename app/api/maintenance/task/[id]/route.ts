@@ -168,7 +168,7 @@ export async function PATCH(
       nextDueOdometer = body.nextDueMileage;
       
       // Validate that the next due mileage is greater than current mileage
-      if (nextDueOdometer <= currentOdometer) {
+      if (nextDueOdometer !== null && nextDueOdometer <= currentOdometer) {
         return NextResponse.json(
           { error: "Next due mileage must be greater than current motorcycle mileage" },
           { status: 400 }
@@ -177,7 +177,7 @@ export async function PATCH(
       
       // Calculate the implied interval if we have a nextDueMileage
       if (currentOdometer > 0) {
-        intervalMiles = nextDueOdometer - currentOdometer;
+        intervalMiles = nextDueOdometer !== null ? nextDueOdometer - currentOdometer : task.intervalMiles;
       }
     } 
     // Otherwise calculate from interval

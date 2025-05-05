@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import ClientLayout from "../components/ClientLayout";
-import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search, X, Check, Download } from "lucide-react";
+import { Archive, Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search, X, Check, Download } from "lucide-react";
 import { 
   format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addMonths, subMonths, isSameMonth, isToday, isSameDay, parseISO,
@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useSettings } from "../contexts/SettingsContext";
 import MaintenanceTemplateImporter from "../components/MaintenanceTemplateImporter";
+import ArchivedTasksView from "../components/ArchivedTasksView";
 
 interface MaintenanceTask {
   id: string;
@@ -40,7 +41,8 @@ export default function MaintenancePage() {
   const { settings, formatDistance, updateSetting } = useSettings();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  
+  const [showArchived, setShowArchived] = useState(false);
+
   // Use the view preference from settings or default to calendar
   const [view, setView] = useState<"calendar" | "list">(settings.maintenanceView || "calendar");
   
@@ -387,6 +389,15 @@ export default function MaintenancePage() {
                         </div>
                       ))}
                     </div>
+                    <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className={`inline-flex items-center px-4 py-2 border ${
+                          showArchived ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-gray-300 text-gray-700'
+                        } rounded-md text-sm font-medium hover:bg-gray-50`}
+                      >
+                        <Archive size={16} className="mr-2" />
+                        {showArchived ? "Hide Archived" : "Show Archived"}
+                      </button>
                     <div className="p-2 border-t flex justify-end">
                       <button
                         onClick={() => setShowMotorcycleFilter(false)}
@@ -420,6 +431,17 @@ export default function MaintenancePage() {
                 Import Templates
               </button>
               
+              {/* Add the Archive button right here */}
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`flex items-center px-4 py-2 border ${
+                  showArchived ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-gray-300 text-gray-700'
+                } rounded-md text-sm font-medium hover:bg-gray-50`}
+              >
+                <Archive size={16} className="mr-2" />
+                {showArchived ? "Hide Archived" : "Show Archived"}
+              </button>
+              
               <Link
                 href="/maintenance/add"
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -428,6 +450,7 @@ export default function MaintenancePage() {
                 Add Task
               </Link>
             </div>
+
           </div>
           
           {/* Active filters display */}
@@ -684,13 +707,20 @@ export default function MaintenancePage() {
           </div>
         )}
         
-        {/* Template Importer Modal */}
+        {/* Maintenance Template Importer Modal */}
         {showTemplateImporter && (
           <MaintenanceTemplateImporter
             motorcycles={motorcycles}
             onClose={() => setShowTemplateImporter(false)}
             onImport={handleImportTasks}
           />
+        )}
+
+        {/* Add this section here - Archived Tasks Section */}
+        {showArchived && (
+          <div className="mt-6">
+            <ArchivedTasksView />
+          </div>
         )}
       </main>
     </ClientLayout>

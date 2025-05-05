@@ -43,6 +43,7 @@ export const maintenanceTasks = sqliteTable("maintenance_tasks", {
   nextDueDate: integer("next_due_date", { mode: "timestamp" }),
   priority: text("priority").default("medium"),
   isRecurring: integer("is_recurring", { mode: "boolean" }).default(true),
+  archived: integer("archived", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
 
