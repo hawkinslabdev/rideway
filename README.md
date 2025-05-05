@@ -1,6 +1,12 @@
-# 🏍️ Rideway - Keep Your Bikes Running Smooth
+<h1 align="center">Rideway</h1>
+
+<h4 align="center">🏍️ Keep your bikes running smooth 🏍️</h4>
+
+> NOTE: This project was 100% vibe coded. It was built to meet our own needs for a feature-rich, user-friendly open source motorcycle maintenance app. It's still **work in progress**. Feel free to collaborate to bring the first version live.
 
 Hey fellow riders! Rideway is your digital garage buddy that helps you stay on top of maintenance for all your motorcycles. Whether you're wrenching on a vintage café racer or maintaining a fleet of modern sport bikes, Rideway's got your back.
+
+<h4 align="center"><a href="#screenshots">SCREENSHOTS</a> | <a href="#">DEMO</a></h4>
 
 ## Why Rideway?
 
@@ -79,6 +85,11 @@ The setup wizard will walk you through creating your account and adding your fir
 - Export your complete garage anytime as JSON
 - Import your data on any device running Rideway
 - No cloud subscriptions or vendor lock-in
+
+## Screenshots
+
+<h5 align="center">Login</h5>
+<img src=".github/images/screenshot_1.png" align="center" />
 
 ## Contributing
 

@@ -14,7 +14,13 @@ export default withAuth(
       return NextResponse.redirect(new URL("/setup", req.url));
     }
 
-    return NextResponse.next();
+    // Add cache-control headers to prevent caching of protected routes
+    const response = NextResponse.next();
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+
+    return response;
   },
   {
     pages: {
@@ -31,7 +37,7 @@ export default withAuth(
           return true;
         }
         // Require authentication for all other pages
-        return !!token; 
+        return !!token;
       },
     },
   }
