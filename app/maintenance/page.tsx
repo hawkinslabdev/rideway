@@ -1,9 +1,9 @@
-// app/maintenance/page.tsx
+// File: app/maintenance/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import ClientLayout from "../components/ClientLayout";
-import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
+import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search, X, Check, Download } from "lucide-react";
 import { 
   format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addMonths, subMonths, isSameMonth, isToday, isSameDay, parseISO,
@@ -11,6 +11,7 @@ import {
 } from "date-fns";
 import Link from "next/link";
 import { useSettings } from "../contexts/SettingsContext";
+import MaintenanceTemplateImporter from "../components/MaintenanceTemplateImporter";
 
 interface MaintenanceTask {
   id: string;
@@ -32,6 +33,7 @@ interface MotorcycleOption {
   make: string;
   model: string;
   year: number;
+  currentMileage: number | null;
 }
 
 export default function MaintenancePage() {
@@ -52,6 +54,10 @@ export default function MaintenancePage() {
   // State for motorcycle filter
   const [selectedMotorcycles, setSelectedMotorcycles] = useState<string[]>([]);
   const [showMotorcycleFilter, setShowMotorcycleFilter] = useState(false);
+  
+  // State for template importer
+  const [showTemplateImporter, setShowTemplateImporter] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,6 +80,17 @@ export default function MaintenancePage() {
         const motorcyclesData = await motorcyclesResponse.json();
         setMotorcycles(motorcyclesData.motorcycles);
         
+        // Check for success messages in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('created') === 'true') {
+          setImportSuccess("Maintenance task created successfully");
+          // Clear the URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (urlParams.get('imported') === 'true') {
+          setImportSuccess("Maintenance templates imported successfully");
+          // Clear the URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -180,6 +197,41 @@ export default function MaintenancePage() {
     if (b.dueDate) return 1;
     return 0;
   });
+  
+  // Handle importing templates
+  const handleImportTasks = async (tasks: any[]) => {
+    try {
+      const response = await fetch("/api/maintenance/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(tasks),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to import maintenance templates");
+      }
+      
+      const data = await response.json();
+      
+      // Refresh the tasks list
+      const tasksResponse = await fetch("/api/maintenance");
+      if (!tasksResponse.ok) {
+        throw new Error("Failed to refresh maintenance tasks");
+      }
+      const tasksData = await tasksResponse.json();
+      setMaintenanceTasks(tasksData.tasks);
+      
+      // Show success message
+      setImportSuccess(`Successfully imported ${data.tasks.length} maintenance tasks`);
+      
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -212,6 +264,20 @@ export default function MaintenancePage() {
           <h1 className="text-2xl font-bold">Maintenance Schedule</h1>
           <p className="text-gray-600">Plan and track your motorcycle maintenance</p>
         </div>
+        
+        {/* Success message */}
+        {importSuccess && (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4 flex items-center">
+            <Check className="h-5 w-5 text-green-500 mr-2" />
+            <p className="text-green-800">{importSuccess}</p>
+            <button 
+              onClick={() => setImportSuccess(null)} 
+              className="ml-auto text-green-700 hover:text-green-900"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
@@ -345,13 +411,23 @@ export default function MaintenancePage() {
               </select>
             </div>
 
-            <Link
-              href="/maintenance/add"
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              <Plus size={16} className="mr-2" />
-              Add Task
-            </Link>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowTemplateImporter(true)}
+                className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-md hover:bg-gray-50"
+              >
+                <Download size={16} className="mr-2" />
+                Import Templates
+              </button>
+              
+              <Link
+                href="/maintenance/add"
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                <Plus size={16} className="mr-2" />
+                Add Task
+              </Link>
+            </div>
           </div>
           
           {/* Active filters display */}
@@ -606,6 +682,15 @@ export default function MaintenancePage() {
               </table>
             </div>
           </div>
+        )}
+        
+        {/* Template Importer Modal */}
+        {showTemplateImporter && (
+          <MaintenanceTemplateImporter
+            motorcycles={motorcycles}
+            onClose={() => setShowTemplateImporter(false)}
+            onImport={handleImportTasks}
+          />
         )}
       </main>
     </ClientLayout>

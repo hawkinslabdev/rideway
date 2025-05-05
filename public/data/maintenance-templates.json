@@ -1,0 +1,353 @@
+[
+    {
+      "id": "daily-commuter",
+      "name": "Daily Commuter",
+      "description": "Built for urban riders who depend on their bike every day. This schedule keeps your motorcycle reliable, efficient, and safe through heavy traffic, short trips, and all-weather use.",
+      "tasks": [
+        {
+          "name": "Engine Oil Change",
+          "description": "Replace engine oil and oil filter to keep engine healthy during stop-and-go traffic.",
+          "intervalMiles": 10000,
+          "intervalDays": 365,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Fluid",
+          "description": "Check and replace brake fluid to maintain braking performance in variable conditions.",
+          "intervalMiles": null,
+          "intervalDays": 730,
+          "priority": "high"
+        },
+        {
+          "name": "Fork Oil",
+          "description": "Inspect and replace fork oil to ensure smooth front-end performance and safety.",
+          "intervalMiles": 30000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Brake Pads",
+          "description": "Check pad wear and replace to maintain reliable stopping in urban riding.",
+          "intervalMiles": 30000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain Clean/Lube",
+          "description": "Clean and lubricate chain to prevent premature wear in all-weather commuting.",
+          "intervalMiles": 1000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Chain Replacement",
+          "description": "Inspect and replace chain and sprockets if worn to avoid drivetrain issues.",
+          "intervalMiles": 30000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Air Filter",
+          "description": "Clean or replace to ensure clean airflow in urban environments.",
+          "intervalMiles": 20000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Coolant",
+          "description": "Check and replace coolant to prevent overheating in traffic conditions.",
+          "intervalMiles": 40000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Spark Plugs",
+          "description": "Check and replace spark plugs for consistent performance and fuel efficiency.",
+          "intervalMiles": 30000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Valve Clearance",
+          "description": "Check and adjust valve clearance to avoid power loss and maintain engine health.",
+          "intervalMiles": 30000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Tires",
+          "description": "Check wear and pressure; replace when needed for safe commuting.",
+          "intervalMiles": 20000,
+          "intervalDays": null,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "sport-rider",
+      "name": "Sport & Track Rider",
+      "description": "Designed for performance-focused riders who push their machines hard — whether carving canyons or chasing lap times. Prioritizes engine health, precise handling, and peak braking performance.",
+      "tasks": [
+        {
+          "name": "Engine Oil Change",
+          "description": "Replace engine oil and oil filter with high-performance synthetic oil for high-revving engines.",
+          "intervalMiles": 5000,
+          "intervalDays": 180,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Fluid",
+          "description": "Replace brake fluid with high-temperature DOT 4 to maintain hard braking performance.",
+          "intervalMiles": null,
+          "intervalDays": 365,
+          "priority": "high"
+        },
+        {
+          "name": "Fork Oil",
+          "description": "Replace fork oil and inspect seals to retain front-end sharpness and handling.",
+          "intervalMiles": 20000,
+          "intervalDays": 730,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Pads",
+          "description": "Inspect and replace pads for consistent braking during aggressive riding or track days.",
+          "intervalMiles": 15000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain Clean/Lube",
+          "description": "Frequent cleaning and lubrication with performance lube to handle high torque loads.",
+          "intervalMiles": 500,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain Tension",
+          "description": "Check and adjust chain slack for maximum power delivery and safety.",
+          "intervalMiles": 2000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Air Filter",
+          "description": "Replace more often to ensure maximum airflow and throttle response.",
+          "intervalMiles": 10000,
+          "intervalDays": 365,
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "id": "touring-rider",
+      "name": "Touring & Adventure Rider",
+      "description": "Perfect for riders clocking long distances on highways or remote trails. This schedule emphasizes durability, comfort, and preparedness for extended travel in varied conditions.",
+      "tasks": [
+        {
+          "name": "Engine Oil Change",
+          "description": "Use high-quality oil and change regularly to maintain engine health over long trips.",
+          "intervalMiles": 8000,
+          "intervalDays": 365,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Fluid",
+          "description": "Replace fluid to ensure consistent braking performance on extended rides.",
+          "intervalMiles": null,
+          "intervalDays": 730,
+          "priority": "high"
+        },
+        {
+          "name": "Fork Oil",
+          "description": "Refresh fork oil to preserve front suspension performance during long travel.",
+          "intervalMiles": 25000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Brake Pads",
+          "description": "Inspect often and replace to ensure confident braking under load.",
+          "intervalMiles": 25000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain Clean/Lube",
+          "description": "Clean and lube chain after long rides, especially in dirt or rain.",
+          "intervalMiles": 1000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Chain Replacement",
+          "description": "Replace chain and sprockets to avoid failure far from home.",
+          "intervalMiles": 25000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Air Filter",
+          "description": "Replace more frequently if riding in dusty or remote environments.",
+          "intervalMiles": 15000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Coolant",
+          "description": "Change coolant regularly to prevent overheating on long rides.",
+          "intervalMiles": 30000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Spark Plugs",
+          "description": "Replace to ensure clean ignition on long-distance travel.",
+          "intervalMiles": 25000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Valve Clearance",
+          "description": "Check valve clearance before long trips to avoid performance loss.",
+          "intervalMiles": 30000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Tires",
+          "description": "Inspect and replace to avoid breakdowns far from services.",
+          "intervalMiles": 20000,
+          "intervalDays": null,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "cruiser-rider",
+      "name": "Cruiser & Chopper Rider",
+      "description": "Tailored for laid-back riders who enjoy relaxed cruising and maintaining their machines. Focuses on longevity, vibration control, and keeping things running smooth and stylish.",
+      "tasks": [
+        {
+          "name": "Engine Oil Change",
+          "description": "Use high-mileage or semi-synthetic oil; change regularly to protect large-displacement engines.",
+          "intervalMiles": 8000,
+          "intervalDays": 365,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Fluid",
+          "description": "Replace fluid to preserve smooth brake feel and safety.",
+          "intervalMiles": null,
+          "intervalDays": 730,
+          "priority": "high"
+        },
+        {
+          "name": "Fork Oil",
+          "description": "Replace fork oil to preserve ride comfort and smooth cruising.",
+          "intervalMiles": 30000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Brake Pads",
+          "description": "Check pads during tire or oil changes; replace if worn.",
+          "intervalMiles": 20000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain / Belt Maintenance",
+          "description": "Clean chain or check belt condition; replace as needed.",
+          "intervalMiles": 20000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Air Filter",
+          "description": "Replace to maintain optimal engine tone and throttle response.",
+          "intervalMiles": 20000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Spark Plugs",
+          "description": "Change to preserve smooth idling and low-end torque.",
+          "intervalMiles": 20000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Tires",
+          "description": "Inspect for cracks or flat spots; replace to ensure safe cruising.",
+          "intervalMiles": 18000,
+          "intervalDays": null,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "standard-rider",
+      "name": "Standard / General Purpose Rider",
+      "description": "A balanced maintenance schedule for riders who use their bike for a bit of everything — commuting, weekend rides, and occasional trips. Practical, dependable, and easy to follow.",
+      "tasks": [
+        {
+          "name": "Engine Oil Change",
+          "description": "Regular oil and filter changes to suit a wide range of conditions.",
+          "intervalMiles": 10000,
+          "intervalDays": 365,
+          "priority": "high"
+        },
+        {
+          "name": "Brake Fluid",
+          "description": "Replace fluid every 2 years to ensure safe braking.",
+          "intervalMiles": null,
+          "intervalDays": 730,
+          "priority": "high"
+        },
+        {
+          "name": "Fork Oil",
+          "description": "Change fork oil to maintain stable front suspension.",
+          "intervalMiles": 30000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Brake Pads",
+          "description": "Inspect pads and replace when worn to maintain safety.",
+          "intervalMiles": 25000,
+          "intervalDays": null,
+          "priority": "high"
+        },
+        {
+          "name": "Chain Clean/Lube",
+          "description": "Keep chain clean and lubed to extend its life.",
+          "intervalMiles": 1000,
+          "intervalDays": null,
+          "priority": "medium"
+        },
+        {
+          "name": "Air Filter",
+          "description": "Replace to maintain performance and fuel efficiency.",
+          "intervalMiles": 20000,
+          "intervalDays": 730,
+          "priority": "medium"
+        },
+        {
+          "name": "Spark Plugs",
+          "description": "Replace to ensure reliable starting and engine smoothness.",
+          "intervalMiles": 25000,
+          "intervalDays": 1095,
+          "priority": "medium"
+        },
+        {
+          "name": "Tires",
+          "description": "Inspect tread and pressure often; replace as needed.",
+          "intervalMiles": 20000,
+          "intervalDays": null,
+          "priority": "high"
+        }
+      ]
+    }
+  ]
+  
