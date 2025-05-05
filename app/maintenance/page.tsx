@@ -3,9 +3,13 @@
 import { useState, useEffect } from "react";
 import ClientLayout from "../components/ClientLayout";
 import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { format, addDays, startOfWeek, addWeeks, subWeeks, endOfWeek, 
-         isToday, isSameDay, isSameMonth, parseISO } from "date-fns";
+import { 
+  format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  addMonths, subMonths, isSameMonth, isToday, isSameDay, parseISO,
+  eachDayOfInterval
+} from "date-fns";
 import Link from "next/link";
+import { useSettings } from "../contexts/SettingsContext";
 
 interface MaintenanceTask {
   id: string;
@@ -21,9 +25,13 @@ interface MaintenanceTask {
 }
 
 export default function MaintenancePage() {
+  const { settings, formatDistance, updateSetting } = useSettings();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  
+  // Use the view preference from settings instead of a local state
+  const [view, setView] = useState<"calendar" | "list">(settings.maintenanceView);
+  
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,22 +60,46 @@ export default function MaintenancePage() {
     fetchMaintenanceTasks();
   }, []);
 
-  // Handle week navigation
-  const goToPreviousWeek = () => {
-    setCurrentDate(subWeeks(currentDate, 1));
+  // Handle view switching with persistence
+  const handleViewChange = (newView: "calendar" | "list") => {
+    setView(newView);
+    // Save the view preference to settings
+    updateSetting("maintenanceView", newView);
   };
 
-  const goToNextWeek = () => {
-    setCurrentDate(addWeeks(currentDate, 1));
+  // Month navigation
+  const goToPreviousMonth = () => {
+    setCurrentDate(subMonths(currentDate, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(addMonths(currentDate, 1));
   };
 
   const goToToday = () => {
     setCurrentDate(new Date());
   };
 
-  // Calendar view helpers
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Generate calendar days for the current month
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const startDate = startOfWeek(monthStart);
+  const endDate = endOfWeek(monthEnd);
+  
+  // Get all days in the date range
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+  
+  // Group days into weeks for the grid
+  const weeks: Date[][] = [];
+  let currentWeek: Date[] = [];
+  
+  calendarDays.forEach(day => {
+    currentWeek.push(day);
+    if (currentWeek.length === 7) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+  });
   
   const getTasksForDate = (date: Date) => {
     return maintenanceTasks.filter(task => {
@@ -136,7 +168,7 @@ export default function MaintenancePage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setView("calendar")}
+                  onClick={() => handleViewChange("calendar")}
                   className={`px-3 py-1 rounded-md text-sm font-medium ${
                     view === "calendar" ? "bg-white shadow" : "text-gray-600"
                   }`}
@@ -144,7 +176,7 @@ export default function MaintenancePage() {
                   Calendar
                 </button>
                 <button
-                  onClick={() => setView("list")}
+                  onClick={() => handleViewChange("list")}
                   className={`px-3 py-1 rounded-md text-sm font-medium ${
                     view === "list" ? "bg-white shadow" : "text-gray-600"
                   }`}
@@ -198,7 +230,7 @@ export default function MaintenancePage() {
               </h2>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={goToPreviousWeek}
+                  onClick={goToPreviousMonth}
                   className="p-2 hover:bg-gray-100 rounded"
                 >
                   <ChevronLeft size={20} />
@@ -210,7 +242,7 @@ export default function MaintenancePage() {
                   Today
                 </button>
                 <button
-                  onClick={goToNextWeek}
+                  onClick={goToNextMonth}
                   className="p-2 hover:bg-gray-100 rounded"
                 >
                   <ChevronRight size={20} />
@@ -221,45 +253,51 @@ export default function MaintenancePage() {
             {/* Calendar Grid */}
             <div className="p-4">
               <div className="grid grid-cols-7 gap-px bg-gray-200">
+                {/* Day headers */}
                 {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
                   <div key={day} className="bg-gray-50 p-2 text-center text-sm font-medium text-gray-500">
                     {day}
                   </div>
                 ))}
-                {weekDays.map(day => (
-                  <div
-                    key={day.toISOString()}
-                    className={`bg-white p-2 min-h-[100px] cursor-pointer hover:bg-gray-50 ${
-                      !isSameMonth(day, currentDate) ? "text-gray-400" : ""
-                    } ${
-                      isToday(day) ? "ring-2 ring-blue-500" : ""
-                    } ${selectedDate && isSameDay(day, selectedDate) ? "bg-blue-50" : ""}`}
-                    onClick={() => setSelectedDate(day)}
-                  >
-                    <div className="font-medium text-sm mb-1">
-                      {format(day, "d")}
-                    </div>
-                    {hasTasks(day) && (
-                      <div className="space-y-1 max-h-[80px] overflow-y-auto">
-                        {getTasksForDate(day).map(task => (
-                          <div
-                            key={task.id}
-                            className={`text-xs p-1 rounded truncate ${
-                              task.priority === "high"
-                                ? "bg-red-100 text-red-800"
-                                : task.priority === "medium"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                            title={`${task.motorcycle}: ${task.task}`}
-                          >
-                            {task.motorcycle}: {task.task}
-                          </div>
-                        ))}
+                
+                {/* Calendar days */}
+                {weeks.map((week, weekIndex) => (
+                  // Render each week
+                  week.map((day, dayIndex) => (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`bg-white p-2 min-h-[80px] cursor-pointer hover:bg-gray-50 ${
+                        !isSameMonth(day, currentDate) ? "text-gray-400" : ""
+                      } ${
+                        isToday(day) ? "ring-2 ring-blue-500" : ""
+                      } ${selectedDate && isSameDay(day, selectedDate) ? "bg-blue-50" : ""}`}
+                      onClick={() => setSelectedDate(day)}
+                    >
+                      <div className="font-medium text-sm mb-1">
+                        {format(day, "d")}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {hasTasks(day) && (
+                        <div className="space-y-1 max-h-[60px] overflow-y-auto">
+                          {getTasksForDate(day).map(task => (
+                            <div
+                              key={task.id}
+                              className={`text-xs p-1 rounded truncate ${
+                                task.priority === "high"
+                                  ? "bg-red-100 text-red-800"
+                                  : task.priority === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                              title={`${task.motorcycle}: ${task.task}`}
+                            >
+                              {task.motorcycle}: {task.task}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )).flat()}
               </div>
             </div>
 
@@ -354,9 +392,9 @@ export default function MaintenancePage() {
                           {task.dueDate ? format(parseISO(task.dueDate), "MMM d, yyyy") : "N/A"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {task.dueMileage ? `${task.dueMileage.toLocaleString()} mi` : "N/A"}
+                          {task.dueMileage ? formatDistance(task.dueMileage) : "N/A"}
                           {task.currentMileage && task.dueMileage ? 
-                            ` (${task.dueMileage - task.currentMileage} mi left)` : 
+                            ` (${formatDistance(task.dueMileage - task.currentMileage)} left)` : 
                             ""}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

@@ -1,11 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import ClientLayout from "../../components/ClientLayout";
+import { useParams, useRouter } from "next/navigation";
+import ClientLayout from "../../../components/ClientLayout";
 import Link from "next/link";
-import { ArrowLeft, Plus, AlertCircle } from "lucide-react";
-import { useSettings } from "../../contexts/SettingsContext";
+import { ArrowLeft, Save, AlertCircle } from "lucide-react";
+import { useSettings } from "../../../contexts/SettingsContext";
+
+interface MaintenanceTask {
+  id: string;
+  task: string;
+  description: string | null;
+  motorcycle: string;
+  motorcycleId: string;
+  dueDate: string | null;
+  dueMileage: number | null;
+  currentMileage: number | null;
+  intervalMiles: number | null;
+  intervalDays: number | null;
+  priority: string;
+  isRecurring: boolean;
+}
 
 interface Motorcycle {
   id: string;
@@ -13,10 +28,10 @@ interface Motorcycle {
   make: string;
   model: string;
   year: number;
-  currentMileage: number | null;
 }
 
-export default function AddMaintenancePage() {
+export default function EditMaintenanceTaskPage() {
+  const params = useParams();
   const router = useRouter();
   const { settings, convertDistance, getUnitsLabel } = useSettings();
   const unitLabel = getUnitsLabel().distance;
@@ -24,6 +39,7 @@ export default function AddMaintenancePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [task, setTask] = useState<MaintenanceTask | null>(null);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   
   const [formData, setFormData] = useState({
@@ -36,34 +52,63 @@ export default function AddMaintenancePage() {
     isRecurring: true,
   });
 
-  useEffect(() => {
-    const fetchMotorcycles = async () => {
+  // In the useEffect hook where the task data is fetched
+useEffect(() => {
+    const fetchData = async () => {
+      if (!params.id) return;
+      
       try {
-        const response = await fetch("/api/motorcycles");
-        
-        if (!response.ok) {
+        // Fetch all motorcycles first
+        const motorcyclesResponse = await fetch("/api/motorcycles");
+        if (!motorcyclesResponse.ok) {
           throw new Error("Failed to fetch motorcycles");
         }
+        const motorcyclesData = await motorcyclesResponse.json();
+        setMotorcycles(motorcyclesData.motorcycles);
         
-        const data = await response.json();
-        setMotorcycles(data.motorcycles);
-        
-        // Set default motorcycle if available
-        if (data.motorcycles.length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            motorcycleId: data.motorcycles[0].id
-          }));
+        // Then fetch the specific task
+        const taskResponse = await fetch(`/api/maintenance/task/${params.id}`);
+        if (!taskResponse.ok) {
+          if (taskResponse.status === 404) {
+            throw new Error("Maintenance task not found");
+          }
+          throw new Error("Failed to fetch maintenance task");
         }
+        
+        const taskData = await taskResponse.json();
+        setTask(taskData);
+        
+        // FIXED: Get interval miles directly from the database without conversion
+        // The data is stored in miles in the database
+        let displayIntervalMiles = taskData.intervalMiles ? taskData.intervalMiles.toString() : "";
+        
+        // FIXED: Only convert if user's preference is metric (km)
+        if (settings.units === 'metric' && displayIntervalMiles) {
+          // Convert from miles to kilometers
+          const mileageValue = parseFloat(displayIntervalMiles);
+          const kmValue = Math.round(mileageValue * 1.60934); // miles to km, rounded to nearest whole number
+          displayIntervalMiles = kmValue.toString();
+        }
+        
+        // Update form data
+        setFormData({
+          motorcycleId: taskData.motorcycleId,
+          name: taskData.name,
+          description: taskData.description || "",
+          intervalMiles: displayIntervalMiles,
+          intervalDays: taskData.intervalDays ? taskData.intervalDays.toString() : "",
+          priority: taskData.priority || "medium",
+          isRecurring: taskData.isRecurring !== false,  // Default to true if not specified
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchMotorcycles();
-  }, []);
+    
+    fetchData();
+  }, [params.id, settings.units]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -88,11 +133,6 @@ export default function AddMaintenancePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.motorcycleId === "") {
-      setError("Please select a motorcycle");
-      return;
-    }
-    
     if (formData.name === "") {
       setError("Task name is required");
       return;
@@ -108,17 +148,17 @@ export default function AddMaintenancePage() {
     setError(null);
     
     try {
-      // Convert intervalMiles from current units to miles for storage if needed
+      // FIXED: Convert intervalMiles from current units to miles for storage if needed
       let intervalMilesInMiles = formData.intervalMiles;
       if (settings.units === 'metric' && formData.intervalMiles) {
-        // Convert from kilometers to miles - WITH PRECISION FIX
-        const mileageValue = parseFloat(formData.intervalMiles);
-        const milesValue = Math.round(mileageValue * 0.621371); // km to miles, rounded to nearest whole number
+        // Convert from kilometers to miles
+        const kmValue = parseFloat(formData.intervalMiles);
+        const milesValue = Math.round(kmValue * 0.621371); // km to miles, rounded to nearest whole number
         intervalMilesInMiles = milesValue.toString();
       }
       
-      const response = await fetch("/api/maintenance/task", {
-        method: "POST",
+      const response = await fetch(`/api/maintenance/task/${params.id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
@@ -134,11 +174,11 @@ export default function AddMaintenancePage() {
       });
       
       if (!response.ok) {
-        throw new Error("Failed to create maintenance task");
+        throw new Error("Failed to update maintenance task");
       }
       
       // Redirect back to maintenance page
-      router.push("/maintenance?created=true");
+      router.push("/maintenance?updated=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsSubmitting(false);
@@ -157,29 +197,21 @@ export default function AddMaintenancePage() {
     );
   }
   
-  if (motorcycles.length === 0) {
+  if (error || !task) {
     return (
       <ClientLayout>
         <main className="flex-1 overflow-auto p-6">
-          <div className="mb-6">
+          <div className="flex mb-4">
             <Link href="/maintenance" className="flex items-center text-blue-600 hover:text-blue-800">
               <ArrowLeft size={16} className="mr-1" />
               Back to Maintenance
             </Link>
           </div>
-          
-          <div className="max-w-2xl mx-auto bg-white shadow rounded-lg p-6">
-            <div className="flex items-center mb-4">
-              <AlertCircle className="h-5 w-5 text-amber-500 mr-2" />
-              <h2 className="text-xl font-semibold">No Motorcycles Found</h2>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+              <p className="text-red-800">{error || "Maintenance task not found"}</p>
             </div>
-            <p className="text-gray-600 mb-6">
-              You need to add a motorcycle before you can create maintenance tasks.
-            </p>
-            <Link href="/garage/add" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-              <Plus size={16} className="mr-2" />
-              Add Your First Motorcycle
-            </Link>
           </div>
         </main>
       </ClientLayout>
@@ -199,7 +231,7 @@ export default function AddMaintenancePage() {
           
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="bg-blue-600 text-white p-4">
-              <h1 className="text-xl font-bold">Add Maintenance Task</h1>
+              <h1 className="text-xl font-bold">Edit Maintenance Task</h1>
             </div>
             
             <div className="p-6">
@@ -355,12 +387,12 @@ export default function AddMaintenancePage() {
                     {isSubmitting ? (
                       <span className="flex items-center">
                         <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Creating...
+                        Saving...
                       </span>
                     ) : (
                       <span className="flex items-center">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Maintenance Task
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
                       </span>
                     )}
                   </button>

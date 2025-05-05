@@ -10,6 +10,7 @@ export interface AppSettings {
   units: UnitsType;
   language: string;
   theme: ThemeType;
+  maintenanceView: 'calendar' | 'list'; // Added this new preference
 }
 
 // Define the shape of our context
@@ -43,6 +44,7 @@ const defaultSettings: AppSettings = {
   units: config.defaultUnits as UnitsType,
   language: config.defaultLanguage,
   theme: config.defaultTheme as ThemeType,
+  maintenanceView: 'calendar', // Default to calendar view
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -77,6 +79,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ...prev,
       [key]: value
     }));
+    
+    // Save to localStorage immediately for better persistence
+    if (typeof window !== 'undefined') {
+      const savedSettings = localStorage.getItem('rideway-settings');
+      let updatedSettings = { ...settings, [key]: value };
+      
+      if (savedSettings) {
+        updatedSettings = { ...JSON.parse(savedSettings), [key]: value };
+      }
+      
+      localStorage.setItem('rideway-settings', JSON.stringify(updatedSettings));
+    }
   };
 
   // Save all settings
