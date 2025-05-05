@@ -267,3 +267,48 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Await the params before using them
+    const { id } = await params;
+
+    // Verify ownership
+    const motorcycle = await db.query.motorcycles.findFirst({
+      where: and(
+        eq(motorcycles.id, id),
+        eq(motorcycles.userId, session.user.id)
+      ),
+    });
+
+    if (!motorcycle) {
+      return NextResponse.json(
+        { error: "Motorcycle not found" },
+        { status: 404 }
+      );
+    }
+
+    // Delete the motorcycle (cascade will delete related records)
+    await db.delete(motorcycles).where(eq(motorcycles.id, id));
+
+    return NextResponse.json({ message: "Motorcycle deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting motorcycle:", error);
+    return NextResponse.json(
+      { error: "Failed to delete motorcycle" },
+      { status: 500 }
+    );
+  }
+}

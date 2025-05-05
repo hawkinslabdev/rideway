@@ -1,57 +1,129 @@
 "use client";
 
-import { useState } from "react";
-import Sidebar from "../components/Sidebar";
-import { Calendar, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, addDays, startOfWeek, endOfWeek, isToday, isSameDay } from "date-fns";
+import { useState, useEffect } from "react";
+import ClientLayout from "../components/ClientLayout";
+import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { format, addDays, startOfWeek, addWeeks, subWeeks, endOfWeek, 
+         isToday, isSameDay, isSameMonth, parseISO } from "date-fns";
+import Link from "next/link";
+
+interface MaintenanceTask {
+  id: string;
+  motorcycle: string;
+  motorcycleId: string;
+  task: string;
+  description: string | null;
+  dueDate: string | null;
+  dueMileage: number | null;
+  priority: string;
+  isDue: boolean;
+  currentMileage: number | null;
+}
 
 export default function MaintenancePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Mock data
-  const maintenanceTasks = [
-    {
-      id: 1,
-      motorcycle: "Ducati Monster",
-      task: "Oil Change",
-      dueDate: new Date(2025, 4, 15),
-      priority: "high",
-      mileage: 6000,
-    },
-    {
-      id: 2,
-      motorcycle: "Triumph Bonneville",
-      task: "Chain Adjustment",
-      dueDate: new Date(2025, 4, 8),
-      priority: "medium",
-      mileage: 3000,
-    },
-    {
-      id: 3,
-      motorcycle: "Ducati Monster",
-      task: "Valve Check",
-      dueDate: new Date(2025, 5, 20),
-      priority: "medium",
-      mileage: 12000,
-    },
-  ];
+  useEffect(() => {
+    const fetchMaintenanceTasks = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/maintenance");
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch maintenance tasks");
+        }
+        
+        const data = await response.json();
+        setMaintenanceTasks(data.tasks);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    fetchMaintenanceTasks();
+  }, []);
+
+  // Handle week navigation
+  const goToPreviousWeek = () => {
+    setCurrentDate(subWeeks(currentDate, 1));
+  };
+
+  const goToNextWeek = () => {
+    setCurrentDate(addWeeks(currentDate, 1));
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // Calendar view helpers
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  const hasTasks = (date: Date) => {
-    return maintenanceTasks.some(task => isSameDay(task.dueDate, date));
-  };
-
+  
   const getTasksForDate = (date: Date) => {
-    return maintenanceTasks.filter(task => isSameDay(task.dueDate, date));
+    return maintenanceTasks.filter(task => {
+      if (!task.dueDate) return false;
+      return isSameDay(parseISO(task.dueDate), date);
+    });
   };
+  
+  const hasTasks = (date: Date) => {
+    return getTasksForDate(date).length > 0;
+  };
+
+  // Filter tasks for list view
+  const filteredTasks = maintenanceTasks.filter(task => {
+    const matchesSearch = task.task.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         task.motorcycle.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPriority = filterPriority === "all" || task.priority === filterPriority;
+    return matchesSearch && matchesPriority;
+  });
+
+  // Sort tasks by due date
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (a.dueDate && b.dueDate) {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    }
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return 0;
+  });
+
+  if (isLoading) {
+    return (
+      <ClientLayout>
+        <main className="flex-1 overflow-auto p-6">
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </main>
+      </ClientLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ClientLayout>
+        <main className="flex-1 overflow-auto p-6">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-800">Error: {error}</p>
+          </div>
+        </main>
+      </ClientLayout>
+    );
+  }
 
   return (
-    <>
-      <Sidebar />
+    <ClientLayout>
       <main className="flex-1 overflow-auto p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Maintenance Schedule</h1>
@@ -60,7 +132,7 @@ export default function MaintenancePage() {
 
         {/* Toolbar */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div className="flex items-center space-x-4">
               <div className="flex items-center bg-gray-100 rounded-lg p-1">
                 <button
@@ -81,16 +153,38 @@ export default function MaintenancePage() {
                 </button>
               </div>
               
-              <button className="flex items-center px-3 py-2 border rounded-md text-sm hover:bg-gray-50">
-                <Filter size={16} className="mr-2" />
-                Filter
-              </button>
+              <div className="relative max-w-xs">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search className="w-4 h-4 text-gray-500" />
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm"
+                  placeholder="Search tasks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">All Priorities</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
             </div>
 
-            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            <Link
+              href="/maintenance/add"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
               <Plus size={16} className="mr-2" />
               Add Task
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -104,19 +198,19 @@ export default function MaintenancePage() {
               </h2>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}
+                  onClick={goToPreviousWeek}
                   className="p-2 hover:bg-gray-100 rounded"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
-                  onClick={() => setCurrentDate(new Date())}
+                  onClick={goToToday}
                   className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
                 >
                   Today
                 </button>
                 <button
-                  onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}
+                  onClick={goToNextWeek}
                   className="p-2 hover:bg-gray-100 rounded"
                 >
                   <ChevronRight size={20} />
@@ -136,6 +230,8 @@ export default function MaintenancePage() {
                   <div
                     key={day.toISOString()}
                     className={`bg-white p-2 min-h-[100px] cursor-pointer hover:bg-gray-50 ${
+                      !isSameMonth(day, currentDate) ? "text-gray-400" : ""
+                    } ${
                       isToday(day) ? "ring-2 ring-blue-500" : ""
                     } ${selectedDate && isSameDay(day, selectedDate) ? "bg-blue-50" : ""}`}
                     onClick={() => setSelectedDate(day)}
@@ -144,15 +240,18 @@ export default function MaintenancePage() {
                       {format(day, "d")}
                     </div>
                     {hasTasks(day) && (
-                      <div className="space-y-1">
+                      <div className="space-y-1 max-h-[80px] overflow-y-auto">
                         {getTasksForDate(day).map(task => (
                           <div
                             key={task.id}
-                            className={`text-xs p-1 rounded ${
+                            className={`text-xs p-1 rounded truncate ${
                               task.priority === "high"
                                 ? "bg-red-100 text-red-800"
-                                : "bg-yellow-100 text-yellow-800"
+                                : task.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
                             }`}
+                            title={`${task.motorcycle}: ${task.task}`}
                           >
                             {task.motorcycle}: {task.task}
                           </div>
@@ -163,12 +262,57 @@ export default function MaintenancePage() {
                 ))}
               </div>
             </div>
+
+            {/* Selected Date Tasks */}
+            {selectedDate && (
+              <div className="border-t p-4">
+                <h3 className="font-semibold mb-2">
+                  Tasks for {format(selectedDate, "MMMM d, yyyy")}
+                </h3>
+                {getTasksForDate(selectedDate).length > 0 ? (
+                  <div className="space-y-2">
+                    {getTasksForDate(selectedDate).map(task => (
+                      <div key={task.id} className="flex justify-between p-2 border rounded">
+                        <div>
+                          <div className="font-medium">{task.task}</div>
+                          <div className="text-sm text-gray-500">{task.motorcycle}</div>
+                          {task.description && (
+                            <div className="text-sm text-gray-600 mt-1">{task.description}</div>
+                          )}
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              task.priority === "high"
+                                ? "bg-red-100 text-red-800"
+                                : task.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {task.priority}
+                          </span>
+                          <Link
+                            href={`/maintenance/${task.id}/complete`}
+                            className="text-blue-600 hover:text-blue-900 text-sm"
+                          >
+                            Complete
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">No tasks scheduled for this day</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* List View */}
         {view === "list" && (
-          <div className="bg-white rounded-lg shadow">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -183,7 +327,7 @@ export default function MaintenancePage() {
                       Due Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Mileage
+                      Due Mileage
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
@@ -194,47 +338,71 @@ export default function MaintenancePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {maintenanceTasks.map(task => (
-                    <tr key={task.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{task.task}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.motorcycle}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(task.dueDate, "MMM d, yyyy")}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.mileage} mi
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            task.priority === "high"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {task.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button className="text-blue-600 hover:text-blue-900 mr-4">
-                          Complete
-                        </button>
-                        <button className="text-gray-600 hover:text-gray-900">
-                          Edit
-                        </button>
+                  {sortedTasks.length > 0 ? (
+                    sortedTasks.map(task => (
+                      <tr key={task.id} className={`hover:bg-gray-50 ${task.isDue ? 'bg-red-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{task.task}</div>
+                          {task.description && (
+                            <div className="text-xs text-gray-500">{task.description}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {task.motorcycle}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {task.dueDate ? format(parseISO(task.dueDate), "MMM d, yyyy") : "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {task.dueMileage ? `${task.dueMileage.toLocaleString()} mi` : "N/A"}
+                          {task.currentMileage && task.dueMileage ? 
+                            ` (${task.dueMileage - task.currentMileage} mi left)` : 
+                            ""}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              task.priority === "high"
+                                ? "bg-red-100 text-red-800"
+                                : task.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {task.priority}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <Link
+                            href={`/maintenance/${task.id}/complete`}
+                            className="text-blue-600 hover:text-blue-900 mr-4"
+                          >
+                            Complete
+                          </Link>
+                          <Link
+                            href={`/maintenance/${task.id}/edit`}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            Edit
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                        {maintenanceTasks.length === 0 
+                          ? "No maintenance tasks found" 
+                          : "No tasks match your search criteria"}
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
       </main>
-    </>
+    </ClientLayout>
   );
 }

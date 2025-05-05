@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import ClientLayout from "./components/ClientLayout";
 import { Bike, Calendar, Wrench, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { useSettings } from "./contexts/SettingsContext";
 
 interface Motorcycle {
   id: string;
@@ -33,6 +34,7 @@ interface DashboardData {
 }
 
 export default function Home() {
+  const { formatDistance } = useSettings();
   const [data, setData] = useState<DashboardData>({
     motorcycles: [],
     upcomingMaintenance: [],
@@ -142,7 +144,7 @@ export default function Home() {
                     <td className="px-6 py-4">{task.task}</td>
                     <td className="px-6 py-4">
                       {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : 
-                       task.dueMileage ? `${task.dueMileage} miles` : "N/A"}
+                       task.dueMileage ? formatDistance(task.dueMileage) : "N/A"}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -204,7 +206,7 @@ export default function Home() {
                     <div>
                       <p className="text-xs text-gray-500">Current mileage</p>
                       <p className="font-medium">
-                        {motorcycle.currentMileage ? `${motorcycle.currentMileage} miles` : "Not set"}
+                        {motorcycle.currentMileage ? formatDistance(motorcycle.currentMileage) : "Not set"}
                       </p>
                     </div>
                     <button 

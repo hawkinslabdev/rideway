@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import ClientLayout from "../components/ClientLayout";
 import { Bell, Globe, Eye, Save, AlertCircle, Check, Trash2, Download, Upload, Database, AlertTriangle } from "lucide-react";
+import { config, UnitsType, ThemeType } from "../lib/config";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -20,13 +21,31 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [importConfirmText, setImportConfirmText] = useState("");
   
+  // Use the config defaults
   const [settings, setSettings] = useState({
-    emailNotifications: true,
-    maintenanceReminders: true,
-    units: "imperial", // imperial or metric
-    language: "en",
-    theme: "light",
+    emailNotifications: config.defaultEmailNotifications,
+    maintenanceReminders: config.defaultMaintenanceReminders,
+    units: config.defaultUnits as UnitsType,
+    language: config.defaultLanguage,
+    theme: config.defaultTheme as ThemeType,
   });
+
+  // Load user settings from localStorage on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSettings = localStorage.getItem('rideway-settings');
+        if (savedSettings) {
+          setSettings(prev => ({
+            ...prev,
+            ...JSON.parse(savedSettings)
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load settings from localStorage:', err);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -47,9 +66,11 @@ export default function SettingsPage() {
     setSuccess(false);
 
     try {
-      // In a real app, you'd save these settings to the database
-      // For now, we'll just simulate saving
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // In a full implementation, you'd save these settings to the database
+      // For now, we'll save to localStorage for client-side persistence
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rideway-settings', JSON.stringify(settings));
+      }
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -260,8 +281,8 @@ export default function SettingsPage() {
                     onChange={(e) => handleSettingChange("units", e.target.value)}
                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                   >
-                    <option value="imperial">Imperial (miles, gallons)</option>
                     <option value="metric">Metric (kilometers, liters)</option>
+                    <option value="imperial">Imperial (miles, gallons)</option>
                   </select>
                 </div>
                 <div>

@@ -6,11 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ClientLayout from "../../components/ClientLayout";
 import Link from "next/link";
 import { ArrowLeft, Save, Camera } from "lucide-react";
+import { useSettings } from "../../contexts/SettingsContext";
 
 export default function AddMotorcycle() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isInitialSetup = searchParams.get('initial') === 'true';
+  const { settings, getUnitsLabel, convertDistance } = useSettings();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -32,6 +34,8 @@ export default function AddMotorcycle() {
     "KTM", "Suzuki", "Triumph", "Yamaha", "Other"
   ];
 
+  const unitsLabel = getUnitsLabel().distance;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -46,12 +50,24 @@ export default function AddMotorcycle() {
     setError("");
 
     try {
+      // Convert mileage from the current units to imperial (miles) for storage
+      // The server assumes mileage is stored in miles
+      let mileageInMiles = formData.currentMileage;
+      if (settings.units === 'metric' && formData.currentMileage) {
+        // Convert from kilometers to miles
+        const mileageValue = parseFloat(formData.currentMileage);
+        mileageInMiles = convertDistance(mileageValue, 'metric').toString();
+      }
+
       const response = await fetch("/api/motorcycles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          currentMileage: mileageInMiles,
+        }),
       });
 
       if (!response.ok) {
@@ -241,7 +257,7 @@ export default function AddMotorcycle() {
 
                 <div>
                   <label htmlFor="currentMileage" className="block text-sm font-medium text-gray-700">
-                    Current Mileage <span className="text-red-500">*</span>
+                    Current Mileage ({unitsLabel}) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -252,7 +268,7 @@ export default function AddMotorcycle() {
                     value={formData.currentMileage}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="e.g., 5000"
+                    placeholder={`e.g., 5000 ${unitsLabel}`}
                   />
                 </div>
               </div>

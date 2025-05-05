@@ -4,6 +4,7 @@ import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import { Filter, Download, Search, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
+import { useSettings } from "../contexts/SettingsContext";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,6 +28,7 @@ ChartJS.register(
 );
 
 export default function ServiceHistoryPage() {
+  const { formatDistance } = useSettings();
   const [selectedMotorcycle, setSelectedMotorcycle] = useState("all");
   const [dateRange, setDateRange] = useState("all");
 
@@ -239,7 +241,7 @@ export default function ServiceHistoryPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.mileage.toLocaleString()} mi
+                    {formatDistance(record.mileage)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${record.cost.toFixed(2)}

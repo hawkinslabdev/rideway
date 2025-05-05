@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, Wrench, AlertTriangle, Edit, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import Sidebar from "@/app/components/Sidebar";
+import { useSettings } from "@/app/contexts/SettingsContext";
 
 interface Motorcycle {
   id: string;
@@ -47,6 +48,8 @@ interface MaintenanceRecord {
 export default function MotorcycleDetail() {
   const params = useParams();
   const router = useRouter();
+  const { settings, formatDistance } = useSettings();
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
@@ -177,7 +180,9 @@ export default function MotorcycleDetail() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Current Mileage</dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {motorcycle.currentMileage ? `${motorcycle.currentMileage} miles` : "Not set"}
+                      {motorcycle.currentMileage 
+                        ? formatDistance(motorcycle.currentMileage)
+                        : "Not set"}
                     </dd>
                   </div>
                 </dl>
@@ -205,7 +210,7 @@ export default function MotorcycleDetail() {
                           <h4 className="font-medium">{record.task}</h4>
                           <p className="text-sm text-gray-500">
                             {format(new Date(record.date), "MMM d, yyyy")} 
-                            {record.mileage && ` • ${record.mileage} miles`}
+                            {record.mileage && ` • ${formatDistance(record.mileage)}`}
                           </p>
                           {record.notes && (
                             <p className="text-sm text-gray-600 mt-1">{record.notes}</p>
@@ -261,7 +266,7 @@ export default function MotorcycleDetail() {
                           {task.dueMileage && (
                             <div className="flex items-center">
                               <Wrench size={14} className="mr-1" />
-                              Or at: {task.dueMileage} miles
+                              Or at: {formatDistance(task.dueMileage)}
                             </div>
                           )}
                         </div>

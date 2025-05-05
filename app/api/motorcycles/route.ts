@@ -43,6 +43,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     
+    // Ensure mileage is stored as a number
+    const currentMileage = body.currentMileage 
+      ? parseInt(body.currentMileage) 
+      : null;
+    
     const newMotorcycle = await db.insert(motorcycles).values({
       id: randomUUID(),
       userId: session.user.id,
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
       vin: body.vin || null,
       color: body.color || null,
       purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
-      currentMileage: body.currentMileage ? parseInt(body.currentMileage) : null,
+      currentMileage: currentMileage,
       imageUrl: body.imageUrl || null,
       notes: body.notes || null,
       createdAt: new Date(),
