@@ -17,8 +17,7 @@ export async function DELETE() {
       );
     }
 
-    // Due to cascade delete in the schema, deleting the user will automatically
-    // delete all associated motorcycles, maintenance tasks, and records
+    // Due to cascade delete in the schema, deleting the user will automatically delete all associated motorcycles, maintenance tasks, and records
     await db.delete(users).where(eq(users.id, session.user.id));
 
     return NextResponse.json({ message: "Account deleted successfully" });

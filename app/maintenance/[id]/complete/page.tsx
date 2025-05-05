@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ClientLayout from "../../../components/ClientLayout";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, AlertCircle, Calendar, Info, Settings } from "lucide-react";
 import { useSettings } from "../../../contexts/SettingsContext";
 import { DistanceUtil } from "../../../lib/utils/distance";
+import { format, formatDistanceToNow } from "date-fns";
 
 interface MaintenanceTask {
   id: string;
@@ -15,9 +16,19 @@ interface MaintenanceTask {
   description: string | null;
   motorcycle: string;
   motorcycleId: string;
+  
+  // Enhanced fields
+  intervalMiles: number | null;
+  intervalDays: number | null;
   dueDate: string | null;
   dueMileage: number | null;
   currentMileage: number | null;
+  remainingMiles: number | null;
+  completionPercentage: number | null;
+  
+  // Last maintenance info
+  lastCompletedDate: string | null;
+  lastCompletedMileage: number | null;
 }
 
 export default function CompleteMaintenancePage() {
@@ -30,12 +41,14 @@ export default function CompleteMaintenancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [task, setTask] = useState<MaintenanceTask | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   
   const [formData, setFormData] = useState({
     mileage: "",
     cost: "",
     notes: "",
-    receiptUrl: ""
+    receiptUrl: "",
+    resetSchedule: true, // Default to resetting the maintenance schedule
   });
 
   useEffect(() => {
@@ -82,12 +95,23 @@ export default function CompleteMaintenancePage() {
     fetchTask();
   }, [params.id, settings.units]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target as HTMLInputElement;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const validateMileage = (mileage: number | null, currentMileage: number | null): boolean => {
@@ -132,7 +156,8 @@ export default function CompleteMaintenancePage() {
           mileage: storageMileage, // Always send storage units (km) to API
           cost: formData.cost ? parseFloat(formData.cost) : null,
           notes: formData.notes || `Completed ${task.task}`,
-          receiptUrl: formData.receiptUrl || null
+          receiptUrl: formData.receiptUrl || null,
+          resetSchedule: formData.resetSchedule // Send the user's choice about resetting the schedule
         }),
       });
       
@@ -141,26 +166,91 @@ export default function CompleteMaintenancePage() {
         throw new Error(data.error || "Failed to complete maintenance");
       }
       
-      // If record is created successfully and the mileage is higher than current motorcycle mileage,
-      // update the motorcycle's current mileage as well
-      if (storageMileage !== null && task.currentMileage !== null && storageMileage > task.currentMileage) {
-        await fetch(`/api/motorcycles/${task.motorcycleId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            currentMileage: storageMileage
-          }),
-        });
-      }
-      
       // Redirect back to maintenance page
       router.push("/maintenance?completed=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsSubmitting(false);
     }
+  };
+
+  // Helper to render maintenance status info 
+  const renderMaintenanceInfo = () => {
+    if (!task) return null;
+    
+    return (
+      <div className="my-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Maintenance Status</h3>
+        
+        <div className="space-y-2 text-sm">
+          {/* Interval Information */}
+          <div>
+            <span className="text-gray-600">Interval: </span>
+            <span className="font-medium">
+              {task.intervalMiles ? DistanceUtil.format(task.intervalMiles, settings.units) : ''}
+              {task.intervalMiles && task.intervalDays ? ' or ' : ''}
+              {task.intervalDays ? `${task.intervalDays} days` : ''}
+            </span>
+          </div>
+          
+          {/* Due Information */}
+          <div>
+            <span className="text-gray-600">Due at: </span>
+            <span className="font-medium">
+              {task.dueMileage ? DistanceUtil.format(task.dueMileage, settings.units) : 'N/A'}
+              {task.dueDate ? ` or ${format(new Date(task.dueDate), 'MMM d, yyyy')}` : ''}
+            </span>
+          </div>
+          
+          {/* Remaining */}
+          {task.remainingMiles !== null && (
+            <div>
+              <span className="text-gray-600">Remaining: </span>
+              <span className="font-medium">
+                {task.remainingMiles > 0 
+                  ? DistanceUtil.format(task.remainingMiles, settings.units)
+                  : "Overdue"
+                }
+              </span>
+            </div>
+          )}
+          
+          {/* Completion Percentage */}
+          {task.completionPercentage !== null && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span>Progress toward next service</span>
+                <span>{Math.round(task.completionPercentage)}%</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${
+                    task.completionPercentage >= 90 ? 'bg-red-500' : 
+                    task.completionPercentage >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${Math.min(100, task.completionPercentage)}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+          
+          {/* Last completed information */}
+          {(task.lastCompletedDate || task.lastCompletedMileage) && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <span className="text-gray-600">Last completed: </span>
+              <span className="font-medium">
+                {task.lastCompletedDate ? format(new Date(task.lastCompletedDate), 'MMM d, yyyy') : ''}
+                {task.lastCompletedMileage ? 
+                  (task.lastCompletedDate ? ' at ' : '') + 
+                  DistanceUtil.format(task.lastCompletedMileage, settings.units) 
+                  : ''
+                }
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
   
   if (isLoading) {
@@ -221,6 +311,9 @@ export default function CompleteMaintenancePage() {
                 )}
               </div>
               
+              {/* Maintenance Status Information */}
+              {renderMaintenanceInfo()}
+              
               {error && (
                 <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
                   <div className="flex">
@@ -233,7 +326,7 @@ export default function CompleteMaintenancePage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label htmlFor="mileage" className="block text-sm font-medium text-gray-700">
-                    Current Mileage ({unitLabel})
+                    Current Odometer ({unitLabel})
                   </label>
                   <input
                     type="number"
@@ -287,6 +380,72 @@ export default function CompleteMaintenancePage() {
                   />
                 </div>
                 
+                {/* Maintenance Schedule Options */}
+                <div className="bg-blue-50 p-4 rounded-md">
+                  <div className="flex items-start mb-2">
+                    <Settings size={18} className="text-blue-600 mr-2 mt-1 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-800">Maintenance Schedule</h3>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Choose how to schedule the next maintenance
+                      </p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setShowInfoModal(true)}
+                      className="ml-auto p-1 text-blue-600 hover:text-blue-800"
+                    >
+                      <Info size={16} />
+                    </button>
+                  </div>
+                  
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="resetSchedule-true"
+                          name="resetSchedule"
+                          type="radio"
+                          checked={formData.resetSchedule === true}
+                          onChange={() => setFormData(prev => ({ ...prev, resetSchedule: true }))}
+                          className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300"
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="resetSchedule-true" className="font-medium text-gray-700">
+                          Reset schedule
+                        </label>
+                        <p className="text-gray-500">
+                          Calculate the next due maintenance from today's values
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="resetSchedule-false"
+                          name="resetSchedule"
+                          type="radio"
+                          checked={formData.resetSchedule === false}
+                          onChange={() => setFormData(prev => ({ ...prev, resetSchedule: false }))}
+                          className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300"
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="resetSchedule-false" className="font-medium text-gray-700">
+                          Maintain original schedule
+                        </label>
+                        <p className="text-gray-500">
+                          {task.dueMileage && task.remainingMiles && task.remainingMiles > 0 
+                            ? `Keep next service due at ${DistanceUtil.format(task.dueMileage, settings.units)}`
+                            : "Adjust for next interval from original schedule"
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 <div>
                   <label htmlFor="receiptUrl" className="block text-sm font-medium text-gray-700">
                     Receipt URL (Optional)
@@ -325,6 +484,38 @@ export default function CompleteMaintenancePage() {
             </div>
           </div>
         </div>
+        
+        {/* Info Modal */}
+        {showInfoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center">
+                <Info size={20} className="text-blue-600 mr-2" />
+                Maintenance Scheduling Options
+              </h3>
+              <div className="space-y-4 text-sm">
+                <p>
+                  <strong>Reset schedule:</strong> This option recalculates the next maintenance due date based on today's odometer reading. 
+                  Choose this when you want to start a fresh maintenance cycle.
+                </p>
+                <p>
+                  <strong>Maintain original schedule:</strong> This preserves the original maintenance schedule. 
+                  If you're doing maintenance early, the next due date will remain unchanged. 
+                  If you're doing maintenance late, it will adjust to keep you on the correct interval cycle.
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowInfoModal(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </ClientLayout>
   );

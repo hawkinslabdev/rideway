@@ -45,13 +45,13 @@ export async function GET() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Calculate upcoming maintenance based on tasks and records
+    // Process maintenance tasks to include relevant information
     const maintenanceTasksList = tasks.map(task => {
       // Find the motorcycle this task belongs to
       const motorcycle = userMotorcycles.find(m => m.id === task.motorcycleId);
       
       if (!motorcycle) {
-        return null; // Skip if motorcycle not found (shouldn't happen)
+        return null; // Skip if motorcycle not found
       }
 
       // Get all maintenance records for this task, sorted by most recent first
@@ -61,45 +61,42 @@ export async function GET() {
       // Get the most recent maintenance record
       const lastRecord = taskRecords.length > 0 ? taskRecords[0] : null;
       
-      let dueDate: Date | null = null;
-      let dueMileage: number | null = null;
+      // Determine if the task is due based on the next due values
+      const isDueByDate = task.nextDueDate && task.nextDueDate <= today;
+      const isDueByMileage = task.nextDueOdometer && motorcycle.currentMileage && 
+                              task.nextDueOdometer <= motorcycle.currentMileage;
+      const isDue = isDueByDate || isDueByMileage;
 
-      // Calculate next due date/mileage based on intervals and last record
-      if (lastRecord) {
-        // If task has a day interval, calculate the next due date
-        if (task.intervalDays) {
-          dueDate = new Date(lastRecord.date);
-          dueDate.setDate(dueDate.getDate() + task.intervalDays);
+      // Calculate remaining values
+      let remainingMiles = null;
+      if (task.nextDueOdometer && motorcycle.currentMileage) {
+        remainingMiles = task.nextDueOdometer - motorcycle.currentMileage;
+        // If negative, the maintenance is overdue
+        if (remainingMiles < 0) {
+          remainingMiles = 0;
         }
-        
-        // If task has a mileage interval and last record has mileage, calculate next due mileage
-        if (task.intervalMiles && lastRecord.mileage) {
-          dueMileage = lastRecord.mileage + task.intervalMiles;
-        }
-      } else {
-        // First time maintenance - calculate from current values
-        if (task.intervalDays) {
-          // For first maintenance with day interval, use motorcycle purchase date if available, otherwise use today
-          const startDate = motorcycle.purchaseDate || new Date();
-          dueDate = new Date(startDate);
-          dueDate.setDate(dueDate.getDate() + task.intervalDays);
-        }
-        
-        // For first maintenance with mileage interval, use current mileage as baseline
-        if (task.intervalMiles && motorcycle.currentMileage) {
-          dueMileage = motorcycle.currentMileage + task.intervalMiles;
+      }
+      
+      // Calculate completion percentage based on mileage
+      let completionPercentage = null;
+      if (task.intervalMiles && remainingMiles !== null) {
+        completionPercentage = 100 - (remainingMiles / task.intervalMiles * 100);
+        // Cap at 100%
+        if (completionPercentage > 100) {
+          completionPercentage = 100;
         }
       }
 
-      // Determine if the task is due based on either date or mileage
-      const isDueByDate = dueDate && dueDate <= today;
-      const isDueByMileage = dueMileage && motorcycle.currentMileage && dueMileage <= motorcycle.currentMileage;
-      const isDue = isDueByDate || isDueByMileage;
-
-      // Determine priority based on due status
+      // Determine priority based on due status and completion percentage
       let priority = task.priority || "medium";
       if (isDue) {
         priority = "high";
+      } else if (completionPercentage !== null) {
+        if (completionPercentage >= 90) {
+          priority = "high";
+        } else if (completionPercentage >= 75) {
+          priority = "medium";
+        }
       }
 
       return {
@@ -108,23 +105,64 @@ export async function GET() {
         motorcycleId: motorcycle.id,
         task: task.name,
         description: task.description,
-        dueDate: dueDate?.toISOString() || null,
-        dueMileage,
-        priority,
-        isDue,
-        currentMileage: motorcycle.currentMileage,
+        
+        // Interval information
         intervalMiles: task.intervalMiles,
         intervalDays: task.intervalDays,
-        isRecurring: task.isRecurring,
+        
+        // Last maintenance information
         lastCompletedDate: lastRecord?.date || null,
-        lastCompletedMileage: lastRecord?.mileage || null
+        lastCompletedMileage: lastRecord?.mileage || null,
+        
+        // Next due information
+        baseOdometer: task.baseOdometer,
+        baseDate: task.baseDate,
+        dueDate: task.nextDueDate?.toISOString() || null,
+        dueMileage: task.nextDueOdometer,
+        
+        // Current status
+        currentMileage: motorcycle.currentMileage,
+        remainingMiles: remainingMiles,
+        completionPercentage: completionPercentage,
+        
+        priority,
+        isDue,
+        isRecurring: task.isRecurring
       };
     });
 
     // Filter out any null tasks
     const validTasks = maintenanceTasksList.filter(t => t !== null);
 
-    return NextResponse.json({ tasks: validTasks });
+    // Sort tasks by priority, then by remaining miles/days
+    validTasks.sort((a, b) => {
+      // Sort by priority first
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const priorityDiff = priorityOrder[a.priority as keyof typeof priorityOrder] - 
+                            priorityOrder[b.priority as keyof typeof priorityOrder];
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      
+      // If same priority, sort by remaining miles (if both have dueMileage)
+      if (a.remainingMiles !== null && b.remainingMiles !== null) {
+        return a.remainingMiles - b.remainingMiles;
+      }
+      
+      // If either doesn't have remainingMiles, sort by due date
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      
+      // Fallback to sort by task name
+      return a.task.localeCompare(b.task);
+    });
+
+    return NextResponse.json({ 
+      tasks: validTasks,
+      // Also include count of overdue tasks for quick dashboard indicators
+      overdueCount: validTasks.filter(t => t.isDue).length
+    });
   } catch (error) {
     console.error("Maintenance API error:", error);
     return NextResponse.json(

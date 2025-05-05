@@ -62,25 +62,82 @@ export async function POST(
       );
     }
     
+    // Get maintenance mileage (default to current motorcycle mileage if not provided)
+    const maintenanceMileage = body.mileage || motorcycle.currentMileage;
+    const maintenanceDate = new Date();
+    
+    // Determine the interval reset approach
+    const resetSchedule = body.resetSchedule === undefined ? true : body.resetSchedule;
+    
+    // Calculate next due values based on the approach selected
+    let nextDueOdometer = null;
+    let nextDueDate = null;
+    
+    if (resetSchedule) {
+      // Reset approach: calculate from current values
+      if (task.intervalMiles) {
+        nextDueOdometer = maintenanceMileage + task.intervalMiles;
+      }
+      
+      if (task.intervalDays) {
+        nextDueDate = new Date(maintenanceDate);
+        nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+      }
+    } else {
+      // Maintain original schedule approach
+      if (task.nextDueOdometer && task.intervalMiles) {
+        // If maintenance is done early, keep the original due odometer
+        // If maintenance is done late, add the interval to the current odometer
+        nextDueOdometer = (maintenanceMileage < task.nextDueOdometer) 
+          ? task.nextDueOdometer 
+          : maintenanceMileage + task.intervalMiles;
+      }
+      
+      if (task.nextDueDate && task.intervalDays) {
+        // If maintenance is done early, keep the original due date
+        // If maintenance is done late, add the interval to the current date
+        nextDueDate = (maintenanceDate < task.nextDueDate)
+          ? task.nextDueDate
+          : new Date(maintenanceDate.setDate(maintenanceDate.getDate() + task.intervalDays));
+      }
+    }
+    
     // Create a maintenance record
     const newRecord = await db.insert(maintenanceRecords).values({
       id: randomUUID(),
       motorcycleId: task.motorcycleId,
       taskId: task.id,
-      date: new Date(),
-      mileage: body.mileage || motorcycle.currentMileage, 
+      date: maintenanceDate,
+      mileage: maintenanceMileage, 
       cost: body.cost || null,
       notes: body.notes || `Completed ${task.name}`,
       receiptUrl: body.receiptUrl || null,
+      
+      // Enhanced fields for interval tracking
+      isScheduled: true,
+      resetsInterval: resetSchedule,
+      nextDueOdometer: nextDueOdometer,
+      nextDueDate: nextDueDate,
+      
       createdAt: new Date(),
     }).returning();
 
+    // Update the task with new base and next due values
+    await db.update(maintenanceTasks)
+      .set({
+        baseOdometer: maintenanceMileage,
+        baseDate: maintenanceDate,
+        nextDueOdometer: nextDueOdometer,
+        nextDueDate: nextDueDate
+      })
+      .where(eq(maintenanceTasks.id, task.id));
+
     // If the mileage is provided and greater than the current motorcycle mileage,
     // update the motorcycle's current mileage
-    if (body.mileage && (motorcycle.currentMileage === null || body.mileage > motorcycle.currentMileage)) {
+    if (maintenanceMileage && (motorcycle.currentMileage === null || maintenanceMileage > motorcycle.currentMileage)) {
       await db.update(motorcycles)
         .set({
-          currentMileage: body.mileage,
+          currentMileage: maintenanceMileage,
           updatedAt: new Date()
         })
         .where(eq(motorcycles.id, task.motorcycleId));
@@ -88,7 +145,9 @@ export async function POST(
 
     return NextResponse.json({
       message: "Maintenance task completed successfully",
-      record: newRecord[0]
+      record: newRecord[0],
+      nextDueOdometer: nextDueOdometer,
+      nextDueDate: nextDueDate
     });
   } catch (error) {
     console.error("Error completing maintenance task:", error);

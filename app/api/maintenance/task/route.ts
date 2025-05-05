@@ -51,7 +51,20 @@ export async function POST(request: Request) {
       );
     }
     
-    // Create maintenance task
+    // Calculate the next due values based on current motorcycle data
+    const currentDate = new Date();
+    const currentOdometer = motorcycle.currentMileage || 0;
+    
+    // Calculate next due values
+    const nextDueOdometer = body.intervalMiles ? currentOdometer + body.intervalMiles : null;
+    
+    let nextDueDate = null;
+    if (body.intervalDays) {
+      nextDueDate = new Date(currentDate);
+      nextDueDate.setDate(nextDueDate.getDate() + body.intervalDays);
+    }
+    
+    // Create maintenance task with enhanced tracking
     const newTask = await db.insert(maintenanceTasks).values({
       id: randomUUID(),
       motorcycleId: body.motorcycleId,
@@ -59,6 +72,13 @@ export async function POST(request: Request) {
       description: body.description || null,
       intervalMiles: body.intervalMiles || null,
       intervalDays: body.intervalDays || null,
+      
+      // New fields for our hybrid approach
+      baseOdometer: currentOdometer,  // Starting point for interval
+      nextDueOdometer: nextDueOdometer,
+      baseDate: currentDate,
+      nextDueDate: nextDueDate,
+      
       priority: body.priority || "medium",
       isRecurring: body.isRecurring !== undefined ? body.isRecurring : true,
       createdAt: new Date(),
