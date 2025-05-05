@@ -1,8 +1,17 @@
+// app/contexts/SettingsContext.tsx
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { config, UnitsType, ThemeType, getUnitsLabel, convertDistance, formatDistance } from '../lib/config';
+import { config, UnitsType, ThemeType, getUnitsLabel } from '../lib/config';
 import { DistanceUtil } from '../lib/utils/distance';
+import {
+  convertTaskToDisplayUnits,
+  convertMotorcycleToDisplayUnits,
+  convertRecordToDisplayUnits,
+  prepareTaskForStorage,
+  prepareMotorcycleForStorage,
+  prepareRecordForStorage
+} from '../lib/utils/unitsConverter';
 
 // Define the shape of our settings
 export interface AppSettings {
@@ -11,7 +20,7 @@ export interface AppSettings {
   units: UnitsType;
   language: string;
   theme: ThemeType;
-  maintenanceView: 'calendar' | 'list'; // Added this new preference
+  maintenanceView: 'calendar' | 'list';
 }
 
 // Define the shape of our context
@@ -20,11 +29,17 @@ interface SettingsContextType {
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   saveSettings: () => Promise<void>;
   getUnitsLabel: () => { distance: string, volume: string };
-  convertDistance: (value: number, from: UnitsType) => number;
-  formatDistance: (value: number, decimals?: number) => string;
-  // Add these two new properties:
+  formatDistance: (value: number | null | undefined, decimals?: number) => string;
+  // Conversion helpers
   convertToDisplayUnits: (valueInKm: number | null | undefined, decimals?: number) => number | null;
   convertToStorageUnits: (displayValue: number | null | undefined, decimals?: number) => number | null;
+  // Enhanced conversion helpers for complex objects
+  convertTaskToDisplay: (task: any) => any;
+  convertMotorcycleToDisplay: (motorcycle: any) => any;
+  convertRecordToDisplay: (record: any) => any;
+  prepareTaskForStorage: (formData: any) => any;
+  prepareMotorcycleForStorage: (formData: any) => any;
+  prepareRecordForStorage: (formData: any) => any;
 }
 
 // Create the context with a default value
@@ -48,7 +63,7 @@ const defaultSettings: AppSettings = {
   units: config.defaultUnits as UnitsType,
   language: config.defaultLanguage,
   theme: config.defaultTheme as ThemeType,
-  maintenanceView: 'calendar', // Default to calendar view
+  maintenanceView: 'calendar',
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -110,11 +125,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return getUnitsLabel(settings.units);
   };
 
-  // Convert a distance from another unit type to the current unit type
-  const convertToCurrentUnits = (value: number, from: UnitsType): number => {
-    return convertDistance(value, from, settings.units);
-  };
-
   // Format a distance value with the current units
   const formatCurrentDistance = (value: number | null | undefined, decimals = 0): string => {
     return DistanceUtil.format(value, settings.units, decimals);
@@ -130,6 +140,31 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return DistanceUtil.toStorageUnits(displayValue, settings.units, decimals);
   };
 
+  // Enhanced object conversion helpers
+  const convertTaskToDisplay = (task: any) => {
+    return convertTaskToDisplayUnits(task, settings.units);
+  };
+
+  const convertMotorcycleToDisplay = (motorcycle: any) => {
+    return convertMotorcycleToDisplayUnits(motorcycle, settings.units);
+  };
+
+  const convertRecordToDisplay = (record: any) => {
+    return convertRecordToDisplayUnits(record, settings.units);
+  };
+
+  const prepareTaskForStorageHelper = (formData: any) => {
+    return prepareTaskForStorage(formData, settings.units);
+  };
+
+  const prepareMotorcycleForStorageHelper = (formData: any) => {
+    return prepareMotorcycleForStorage(formData, settings.units);
+  };
+
+  const prepareRecordForStorageHelper = (formData: any) => {
+    return prepareRecordForStorage(formData, settings.units);
+  };
+
   // Only render children once settings are loaded from localStorage
   if (!isLoaded) {
     return null; // Or a loading spinner if you prefer
@@ -142,10 +177,16 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateSetting, 
         saveSettings,
         getUnitsLabel: getCurrentUnitsLabel,
-        convertDistance: convertToCurrentUnits,
         formatDistance: formatCurrentDistance,
         convertToDisplayUnits,
-        convertToStorageUnits
+        convertToStorageUnits,
+        // Enhanced helpers
+        convertTaskToDisplay: convertTaskToDisplay,
+        convertMotorcycleToDisplay: convertMotorcycleToDisplay,
+        convertRecordToDisplay: convertRecordToDisplay,
+        prepareTaskForStorage: prepareTaskForStorageHelper,
+        prepareMotorcycleForStorage: prepareMotorcycleForStorageHelper,
+        prepareRecordForStorage: prepareRecordForStorageHelper
       }}
     >
       {children}

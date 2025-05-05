@@ -7,12 +7,13 @@ import ClientLayout from "../../components/ClientLayout";
 import Link from "next/link";
 import { ArrowLeft, Save, Camera } from "lucide-react";
 import { useSettings } from "../../contexts/SettingsContext";
+import { DistanceUtil } from "../../lib/utils/distance";
 
 export default function AddMotorcycle() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isInitialSetup = searchParams.get('initial') === 'true';
-  const { settings, getUnitsLabel, convertDistance } = useSettings();
+  const { settings, getUnitsLabel } = useSettings();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -50,14 +51,9 @@ export default function AddMotorcycle() {
     setError("");
 
     try {
-      // Convert mileage from the current units to imperial (miles) for storage
-      // The server assumes mileage is stored in miles
-      let mileageInMiles = formData.currentMileage;
-      if (settings.units === 'metric' && formData.currentMileage) {
-        // Convert from kilometers to miles
-        const mileageValue = parseFloat(formData.currentMileage);
-        mileageInMiles = convertDistance(mileageValue, 'metric').toString();
-      }
+      // Convert the displayed mileage (in user's preferred units) to storage units (km)
+      const displayMileage = DistanceUtil.parseInput(formData.currentMileage);
+      const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
 
       const response = await fetch("/api/motorcycles", {
         method: "POST",
@@ -66,7 +62,7 @@ export default function AddMotorcycle() {
         },
         body: JSON.stringify({
           ...formData,
-          currentMileage: mileageInMiles,
+          currentMileage: storageMileage, // Always store in kilometers
         }),
       });
 

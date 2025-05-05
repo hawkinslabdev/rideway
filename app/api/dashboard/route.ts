@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, maintenanceTasks, maintenanceRecords } from "@/app/lib/db/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 
@@ -25,90 +25,138 @@ export async function GET() {
       orderBy: (motorcycles, { desc }) => [desc(motorcycles.createdAt)],
     });
 
-    // Get upcoming maintenance tasks
+    if (userMotorcycles.length === 0) {
+      return NextResponse.json({
+        motorcycles: [],
+        upcomingMaintenance: [],
+        overdueCount: 0
+      });
+    }
+
+    // Get motorcycle IDs for querying related data
+    const motorcycleIds = userMotorcycles.map(m => m.id);
+
+    // Get all maintenance tasks for these motorcycles
+    const tasks = await db.query.maintenanceTasks.findMany({
+      where: inArray(maintenanceTasks.motorcycleId, motorcycleIds),
+    });
+
+    // Get all maintenance records for these motorcycles
+    const records = await db.query.maintenanceRecords.findMany({
+      where: inArray(maintenanceRecords.motorcycleId, motorcycleIds),
+      orderBy: [desc(maintenanceRecords.date), desc(maintenanceRecords.createdAt)],
+    });
+
+    // Current date for due date calculations
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const upcomingTasks = await db
-      .select({
-        id: maintenanceTasks.id,
-        motorcycle: motorcycles.name,
-        task: maintenanceTasks.name,
-        description: maintenanceTasks.description,
-        priority: maintenanceTasks.priority,
-        intervalMiles: maintenanceTasks.intervalMiles,
-        intervalDays: maintenanceTasks.intervalDays,
-        motorcycleId: motorcycles.id,
-        currentMileage: motorcycles.currentMileage,
-      })
-      .from(maintenanceTasks)
-      .innerJoin(motorcycles, eq(maintenanceTasks.motorcycleId, motorcycles.id))
-      .where(eq(motorcycles.userId, session.user.id));
+    // Calculate upcoming maintenance based on tasks and records
+    const upcomingTasks = [];
+    let overdueCount = 0;
 
-    // Calculate due dates for maintenance tasks
-    const tasksWithDueDates = await Promise.all(
-      upcomingTasks.map(async (task) => {
-        // Get the last maintenance record for this task
-        const lastRecord = await db.query.maintenanceRecords.findFirst({
-          where: and(
-            eq(maintenanceRecords.taskId, task.id),
-            eq(maintenanceRecords.motorcycleId, task.motorcycleId)
-          ),
-          orderBy: (records, { desc }) => [desc(records.date)],
-        });
+    for (const task of tasks) {
+      // Find the motorcycle this task belongs to
+      const motorcycle = userMotorcycles.find(m => m.id === task.motorcycleId);
+      
+      if (!motorcycle) continue; // Skip if motorcycle not found
 
-        let dueDate: Date | null = null;
-        let dueMileage: number | null = null;
+      // Get all maintenance records for this task, sorted by most recent first
+      const taskRecords = records
+        .filter(r => r.taskId === task.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      // Get the most recent maintenance record
+      const lastRecord = taskRecords.length > 0 ? taskRecords[0] : null;
+      
+      let dueDate: Date | null = null;
+      let dueMileage: number | null = null;
 
-        if (lastRecord) {
-          // Calculate next due date based on interval
-          if (task.intervalDays) {
-            dueDate = new Date(lastRecord.date);
-            dueDate.setDate(dueDate.getDate() + task.intervalDays);
-          }
-          if (task.intervalMiles && lastRecord.mileage) {
-            dueMileage = lastRecord.mileage + task.intervalMiles;
-          }
-        } else {
-          // If no previous record, calculate from purchase date or current date
-          if (task.intervalDays) {
-            dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + task.intervalDays);
-          }
-          if (task.intervalMiles && task.currentMileage) {
-            dueMileage = task.currentMileage + task.intervalMiles;
-          }
+      // Calculate next due date/mileage based on intervals and last record
+      if (lastRecord) {
+        // If task has a day interval, calculate the next due date
+        if (task.intervalDays) {
+          dueDate = new Date(lastRecord.date);
+          dueDate.setDate(dueDate.getDate() + task.intervalDays);
+        }
+        
+        // If task has a mileage interval and last record has mileage, calculate next due mileage
+        if (task.intervalMiles && lastRecord.mileage) {
+          dueMileage = lastRecord.mileage + task.intervalMiles;
+        }
+      } else {
+        // First time maintenance - calculate from current values
+        if (task.intervalDays) {
+          // For first maintenance with day interval, use motorcycle purchase date if available, otherwise use today
+          const startDate = motorcycle.purchaseDate || new Date();
+          dueDate = new Date(startDate);
+          dueDate.setDate(dueDate.getDate() + task.intervalDays);
+        }
+        
+        // For first maintenance with mileage interval, use current mileage as baseline
+        if (task.intervalMiles && motorcycle.currentMileage) {
+          dueMileage = motorcycle.currentMileage + task.intervalMiles;
+        }
+      }
+
+      // Determine if the task is due based on either date or mileage
+      const isDueByDate = dueDate && dueDate <= today;
+      const isDueByMileage = dueMileage && motorcycle.currentMileage && dueMileage <= motorcycle.currentMileage;
+      const isDue = isDueByDate || isDueByMileage;
+
+      // Increment overdue count if task is due
+      if (isDue) {
+        overdueCount++;
+      }
+
+      // Only include tasks that have a due date or mileage
+      if (dueDate || dueMileage) {
+        // Set priority based on due status
+        let priority = task.priority || "medium";
+        if (isDue) {
+          priority = "high";
         }
 
-        // Determine if the task is due
-        const isDue = (dueDate && dueDate <= today) || 
-                     (dueMileage && task.currentMileage && dueMileage <= task.currentMileage);
-
-        return {
-          ...task,
-          dueDate,
+        upcomingTasks.push({
+          id: task.id,
+          motorcycle: motorcycle.name,
+          motorcycleId: motorcycle.id,
+          task: task.name,
+          description: task.description,
+          dueDate: dueDate?.toISOString() || null,
           dueMileage,
+          priority,
           isDue,
-        };
-      })
-    );
+          currentMileage: motorcycle.currentMileage
+        });
+      }
+    }
 
-    // Filter and sort tasks
-    const upcomingMaintenanceTasks = tasksWithDueDates
-      .filter(task => task.dueDate || task.dueMileage)
-      .sort((a, b) => {
-        if (a.dueDate && b.dueDate) {
-          return a.dueDate.getTime() - b.dueDate.getTime();
-        }
-        return 0;
-      })
-      .slice(0, 5); // Get top 5 upcoming tasks
-
-    const overdueCount = tasksWithDueDates.filter(task => task.isDue).length;
+    // Sort upcoming tasks by due date (null values last)
+    const sortedTasks = upcomingTasks.sort((a, b) => {
+      // If both have due dates, sort by date
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      // If only one has a due date, prioritize the one with a date
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      
+      // If neither has a due date but both have due mileage, sort by distance from current mileage
+      if (a.dueMileage && b.dueMileage && a.currentMileage && b.currentMileage) {
+        const aDiff = a.dueMileage - a.currentMileage;
+        const bDiff = b.dueMileage - b.currentMileage;
+        return aDiff - bDiff;
+      }
+      
+      // Default sort by priority
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      return priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder];
+    });
 
     return NextResponse.json({
       motorcycles: userMotorcycles,
-      upcomingMaintenance: upcomingMaintenanceTasks,
+      upcomingMaintenance: sortedTasks.slice(0, 5), // Get top 5 upcoming tasks
       overdueCount,
     });
   } catch (error) {

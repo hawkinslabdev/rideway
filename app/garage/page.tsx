@@ -23,7 +23,7 @@ const DropdownMenu = ({ children, isOpen, onClose, triggerRef }: {
   children: React.ReactNode;
   isOpen: boolean;
   onClose: () => void;
-  triggerRef: React.RefObject<HTMLButtonElement>;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
@@ -248,7 +248,7 @@ export default function Garage() {
                           Details
                         </button>
                         <button
-                          ref={(el) => dropdownTriggerRefs.current[motorcycle.id] = el}
+                          ref={(el) => { dropdownTriggerRefs.current[motorcycle.id] = el; }}
                           onClick={() => setOpenDropdownId(openDropdownId === motorcycle.id ? null : motorcycle.id)}
                           className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-100"
                         >

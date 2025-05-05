@@ -1,3 +1,4 @@
+// app/maintenance/add/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,6 +7,7 @@ import ClientLayout from "../../components/ClientLayout";
 import Link from "next/link";
 import { ArrowLeft, Plus, AlertCircle } from "lucide-react";
 import { useSettings } from "../../contexts/SettingsContext";
+import { DistanceUtil } from "../../lib/utils/distance";
 
 interface Motorcycle {
   id: string;
@@ -18,7 +20,7 @@ interface Motorcycle {
 
 export default function AddMaintenancePage() {
   const router = useRouter();
-  const { settings, convertDistance, getUnitsLabel } = useSettings();
+  const { settings, getUnitsLabel } = useSettings();
   const unitLabel = getUnitsLabel().distance;
   
   const [isLoading, setIsLoading] = useState(true);
@@ -108,14 +110,9 @@ export default function AddMaintenancePage() {
     setError(null);
     
     try {
-      // Convert intervalMiles from current units to miles for storage if needed
-      let intervalMilesInMiles = formData.intervalMiles;
-      if (settings.units === 'metric' && formData.intervalMiles) {
-        // Convert from kilometers to miles - WITH PRECISION FIX
-        const mileageValue = parseFloat(formData.intervalMiles);
-        const milesValue = Math.round(mileageValue * 0.621371); // km to miles, rounded to nearest whole number
-        intervalMilesInMiles = milesValue.toString();
-      }
+      // Convert the mileage interval from display units to storage units (km)
+      const displayIntervalMiles = DistanceUtil.parseInput(formData.intervalMiles);
+      const storageIntervalMiles = DistanceUtil.toStorageUnits(displayIntervalMiles, settings.units);
       
       const response = await fetch("/api/maintenance/task", {
         method: "POST",
@@ -126,7 +123,7 @@ export default function AddMaintenancePage() {
           motorcycleId: formData.motorcycleId,
           name: formData.name,
           description: formData.description || null,
-          intervalMiles: intervalMilesInMiles ? parseInt(intervalMilesInMiles) : null,
+          intervalMiles: storageIntervalMiles, // Store interval in kilometers
           intervalDays: formData.intervalDays ? parseInt(formData.intervalDays) : null,
           priority: formData.priority,
           isRecurring: formData.isRecurring,
@@ -284,6 +281,9 @@ export default function AddMaintenancePage() {
                         {unitLabel}
                       </span>
                     </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      How often this task needs to be done based on mileage
+                    </p>
                   </div>
                   
                   <div>
@@ -305,6 +305,9 @@ export default function AddMaintenancePage() {
                         days
                       </span>
                     </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      How often this task needs to be done based on time
+                    </p>
                   </div>
                 </div>
                 

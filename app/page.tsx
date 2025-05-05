@@ -25,6 +25,7 @@ interface MaintenanceTask {
   task: string;
   dueDate: string | null;
   dueMileage: number | null;
+  currentMileage: number | null;
   priority: string;
   isDue: boolean;
 }

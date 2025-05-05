@@ -7,6 +7,10 @@ import { UnitsType } from '../config';
  * Uses kilometers as the base unit for storage in the database
  */
 export class DistanceUtil {
+  // Conversion constants
+  private static readonly KM_TO_MILES = 0.621371;
+  private static readonly MILES_TO_KM = 1.60934;
+
   /**
    * Convert a distance value from storage units (kilometers) to display units
    * @param valueInKm The value in kilometers from the database
@@ -19,7 +23,7 @@ export class DistanceUtil {
     
     if (displayUnits === 'imperial') {
       // Convert kilometers to miles
-      const miles = valueInKm * 0.621371;
+      const miles = valueInKm * this.KM_TO_MILES;
       return Number(miles.toFixed(decimals));
     }
     
@@ -39,7 +43,7 @@ export class DistanceUtil {
     
     if (displayUnits === 'imperial') {
       // Convert miles to kilometers
-      const kilometers = displayValue * 1.60934;
+      const kilometers = displayValue * this.MILES_TO_KM;
       return Number(kilometers.toFixed(decimals));
     }
     

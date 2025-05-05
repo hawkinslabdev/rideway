@@ -43,6 +43,14 @@ export async function POST(request: Request) {
       );
     }
     
+    // Validate at least one interval is provided
+    if (body.intervalMiles === null && body.intervalDays === null) {
+      return NextResponse.json(
+        { error: "Either mileage interval or time interval must be provided" },
+        { status: 400 }
+      );
+    }
+    
     // Create maintenance task
     const newTask = await db.insert(maintenanceTasks).values({
       id: randomUUID(),

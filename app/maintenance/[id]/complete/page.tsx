@@ -1,3 +1,4 @@
+// app/maintenance/[id]/complete/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,6 +7,7 @@ import ClientLayout from "../../../components/ClientLayout";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
 import { useSettings } from "../../../contexts/SettingsContext";
+import { DistanceUtil } from "../../../lib/utils/distance";
 
 interface MaintenanceTask {
   id: string;
@@ -21,7 +23,7 @@ interface MaintenanceTask {
 export default function CompleteMaintenancePage() {
   const params = useParams();
   const router = useRouter();
-  const { settings, convertDistance, getUnitsLabel } = useSettings();
+  const { settings, getUnitsLabel } = useSettings();
   const unitLabel = getUnitsLabel().distance;
   
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +35,7 @@ export default function CompleteMaintenancePage() {
     mileage: "",
     cost: "",
     notes: "",
+    receiptUrl: ""
   });
 
   useEffect(() => {
@@ -56,11 +59,17 @@ export default function CompleteMaintenancePage() {
         
         setTask(foundTask);
 
-        // Pre-fill mileage if available in the user's preferred units
+        // Pre-fill mileage if available - convert from storage units (km) to display units
         if (foundTask.currentMileage) {
+          // We need to convert the storage value (km) to the display units
+          const displayMileage = DistanceUtil.toDisplayUnits(
+            foundTask.currentMileage, 
+            settings.units
+          );
+          
           setFormData(prev => ({
             ...prev,
-            mileage: foundTask.currentMileage?.toString() || ""
+            mileage: displayMileage?.toString() || ""
           }));
         }
       } catch (err) {
@@ -71,7 +80,7 @@ export default function CompleteMaintenancePage() {
     };
 
     fetchTask();
-  }, [params.id]);
+  }, [params.id, settings.units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -79,6 +88,17 @@ export default function CompleteMaintenancePage() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const validateMileage = (mileage: number | null, currentMileage: number | null): boolean => {
+    // If we don't have mileage input or current motorcycle mileage to validate against, allow it
+    if (mileage === null || currentMileage === null) {
+      return true;
+    }
+    
+    // When storing a new record, the mileage should be at least equal to current mileage
+    // (Allow equal for cases where maintenance is performed but odometer doesn't change)
+    return mileage >= currentMileage;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,12 +110,17 @@ export default function CompleteMaintenancePage() {
     setError(null);
     
     try {
-      // Convert mileage from current units to miles (backend storage format)
-      let mileageInMiles = formData.mileage;
-      if (settings.units === 'metric' && formData.mileage) {
-        // Convert from kilometers to miles
-        const mileageValue = parseFloat(formData.mileage);
-        mileageInMiles = convertDistance(mileageValue, 'metric').toString();
+      // Convert display mileage to storage units (km)
+      const displayMileage = DistanceUtil.parseInput(formData.mileage);
+      const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
+      
+      // Validate that the mileage makes sense (should be at least the current mileage)
+      if (storageMileage !== null && task.currentMileage !== null) {
+        if (!validateMileage(storageMileage, task.currentMileage)) {
+          throw new Error(`Mileage cannot be less than the current motorcycle mileage (${
+            DistanceUtil.format(task.currentMileage, settings.units)
+          })`);
+        }
       }
       
       const response = await fetch(`/api/maintenance/${task.id}/complete`, {
@@ -104,14 +129,30 @@ export default function CompleteMaintenancePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          mileage: mileageInMiles ? parseInt(mileageInMiles) : null,
+          mileage: storageMileage, // Always send storage units (km) to API
           cost: formData.cost ? parseFloat(formData.cost) : null,
-          notes: formData.notes,
+          notes: formData.notes || `Completed ${task.task}`,
+          receiptUrl: formData.receiptUrl || null
         }),
       });
       
       if (!response.ok) {
-        throw new Error("Failed to complete maintenance task");
+        const data = await response.json().catch(() => ({ error: "Failed to complete maintenance" }));
+        throw new Error(data.error || "Failed to complete maintenance");
+      }
+      
+      // If record is created successfully and the mileage is higher than current motorcycle mileage,
+      // update the motorcycle's current mileage as well
+      if (storageMileage !== null && task.currentMileage !== null && storageMileage > task.currentMileage) {
+        await fetch(`/api/motorcycles/${task.motorcycleId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            currentMileage: storageMileage
+          }),
+        });
       }
       
       // Redirect back to maintenance page
@@ -203,6 +244,11 @@ export default function CompleteMaintenancePage() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     placeholder={`Current odometer reading (${unitLabel})`}
                   />
+                  {task.currentMileage && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Current motorcycle mileage: {DistanceUtil.format(task.currentMileage, settings.units)}
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -238,6 +284,21 @@ export default function CompleteMaintenancePage() {
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     placeholder="Enter any details about the maintenance performed"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="receiptUrl" className="block text-sm font-medium text-gray-700">
+                    Receipt URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="receiptUrl"
+                    id="receiptUrl"
+                    value={formData.receiptUrl}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="URL to receipt or invoice"
                   />
                 </div>
                 
