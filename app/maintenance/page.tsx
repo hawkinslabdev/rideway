@@ -1,8 +1,9 @@
+// app/maintenance/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import ClientLayout from "../components/ClientLayout";
-import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Calendar, Plus, Filter, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
 import { 
   format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addMonths, subMonths, isSameMonth, isToday, isSameDay, parseISO,
@@ -24,32 +25,55 @@ interface MaintenanceTask {
   currentMileage: number | null;
 }
 
+// New interface for motorcycles in the filter
+interface MotorcycleOption {
+  id: string;
+  name: string;
+  make: string;
+  model: string;
+  year: number;
+}
+
 export default function MaintenancePage() {
   const { settings, formatDistance, updateSetting } = useSettings();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
-  // Use the view preference from settings instead of a local state
-  const [view, setView] = useState<"calendar" | "list">(settings.maintenanceView);
+  // Use the view preference from settings or default to calendar
+  const [view, setView] = useState<"calendar" | "list">(settings.maintenanceView || "calendar");
   
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
+  const [motorcycles, setMotorcycles] = useState<MotorcycleOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // State for motorcycle filter
+  const [selectedMotorcycles, setSelectedMotorcycles] = useState<string[]>([]);
+  const [showMotorcycleFilter, setShowMotorcycleFilter] = useState(false);
 
   useEffect(() => {
-    const fetchMaintenanceTasks = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/maintenance");
         
-        if (!response.ok) {
+        // Fetch maintenance tasks
+        const tasksResponse = await fetch("/api/maintenance");
+        if (!tasksResponse.ok) {
           throw new Error("Failed to fetch maintenance tasks");
         }
+        const tasksData = await tasksResponse.json();
+        setMaintenanceTasks(tasksData.tasks);
         
-        const data = await response.json();
-        setMaintenanceTasks(data.tasks);
+        // Fetch motorcycles for the filter
+        const motorcyclesResponse = await fetch("/api/motorcycles");
+        if (!motorcyclesResponse.ok) {
+          throw new Error("Failed to fetch motorcycles");
+        }
+        const motorcyclesData = await motorcyclesResponse.json();
+        setMotorcycles(motorcyclesData.motorcycles);
+        
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -57,7 +81,7 @@ export default function MaintenancePage() {
       }
     };
 
-    fetchMaintenanceTasks();
+    fetchData();
   }, []);
 
   // Handle view switching with persistence
@@ -101,8 +125,43 @@ export default function MaintenancePage() {
     }
   });
   
+  // Toggle motorcycle selection in the filter
+  const toggleMotorcycle = (motorcycleId: string) => {
+    setSelectedMotorcycles(prev => {
+      if (prev.includes(motorcycleId)) {
+        return prev.filter(id => id !== motorcycleId);
+      } else {
+        return [...prev, motorcycleId];
+      }
+    });
+  };
+  
+  // Select or deselect all motorcycles
+  const toggleAllMotorcycles = () => {
+    if (selectedMotorcycles.length === motorcycles.length) {
+      setSelectedMotorcycles([]);
+    } else {
+      setSelectedMotorcycles(motorcycles.map(m => m.id));
+    }
+  };
+  
+  // Filter tasks for both calendar and list views
+  const filteredTasks = maintenanceTasks.filter(task => {
+    const matchesSearch = task.task.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         task.motorcycle.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesPriority = filterPriority === "all" || task.priority === filterPriority;
+    
+    // Check if task matches selected motorcycles (if any are selected)
+    const matchesMotorcycle = selectedMotorcycles.length === 0 || 
+                             selectedMotorcycles.includes(task.motorcycleId);
+    
+    return matchesSearch && matchesPriority && matchesMotorcycle;
+  });
+  
+  // Get tasks for a specific calendar date
   const getTasksForDate = (date: Date) => {
-    return maintenanceTasks.filter(task => {
+    return filteredTasks.filter(task => {
       if (!task.dueDate) return false;
       return isSameDay(parseISO(task.dueDate), date);
     });
@@ -112,15 +171,7 @@ export default function MaintenancePage() {
     return getTasksForDate(date).length > 0;
   };
 
-  // Filter tasks for list view
-  const filteredTasks = maintenanceTasks.filter(task => {
-    const matchesSearch = task.task.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         task.motorcycle.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPriority = filterPriority === "all" || task.priority === filterPriority;
-    return matchesSearch && matchesPriority;
-  });
-
-  // Sort tasks by due date
+  // Sort tasks by due date for list view
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     if (a.dueDate && b.dueDate) {
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
@@ -198,6 +249,90 @@ export default function MaintenancePage() {
                 />
               </div>
               
+              {/* Motorcycle Filter Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowMotorcycleFilter(!showMotorcycleFilter)}
+                  className={`inline-flex items-center px-3 py-2 border ${
+                    selectedMotorcycles.length > 0 
+                      ? "border-blue-500 text-blue-700 bg-blue-50" 
+                      : "border-gray-300 text-gray-700"
+                  } rounded-md text-sm font-medium hover:bg-gray-50`}
+                >
+                  <Filter size={16} className="mr-2" />
+                  Motorcycles
+                  {selectedMotorcycles.length > 0 && (
+                    <span className="ml-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {selectedMotorcycles.length}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Dropdown for motorcycle filter */}
+                {showMotorcycleFilter && (
+                  <div className="absolute mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                    <div className="p-2 border-b">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium">Filter by Motorcycle</h3>
+                        <button
+                          onClick={() => setShowMotorcycleFilter(false)}
+                          className="text-gray-400 hover:text-gray-500"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-2">
+                      <div 
+                        className="flex items-center px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer"
+                        onClick={toggleAllMotorcycles}
+                      >
+                        <div className={`w-5 h-5 mr-2 flex items-center justify-center border rounded ${
+                          selectedMotorcycles.length === motorcycles.length 
+                            ? "bg-blue-500 border-blue-500 text-white" 
+                            : "border-gray-300"
+                        }`}>
+                          {selectedMotorcycles.length === motorcycles.length && <Check size={12} />}
+                        </div>
+                        <span className="text-sm font-medium">
+                          {selectedMotorcycles.length === motorcycles.length ? "Deselect All" : "Select All"}
+                        </span>
+                      </div>
+                      
+                      {motorcycles.map(motorcycle => (
+                        <div 
+                          key={motorcycle.id}
+                          className="flex items-center px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer"
+                          onClick={() => toggleMotorcycle(motorcycle.id)}
+                        >
+                          <div className={`w-5 h-5 mr-2 flex items-center justify-center border rounded ${
+                            selectedMotorcycles.includes(motorcycle.id) 
+                              ? "bg-blue-500 border-blue-500 text-white" 
+                              : "border-gray-300"
+                          }`}>
+                            {selectedMotorcycles.includes(motorcycle.id) && <Check size={12} />}
+                          </div>
+                          <div className="flex-1 text-sm">
+                            <div className="font-medium">{motorcycle.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {motorcycle.year} {motorcycle.make} {motorcycle.model}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-2 border-t flex justify-end">
+                      <button
+                        onClick={() => setShowMotorcycleFilter(false)}
+                        className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Apply Filters
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
@@ -218,6 +353,36 @@ export default function MaintenancePage() {
               Add Task
             </Link>
           </div>
+          
+          {/* Active filters display */}
+          {selectedMotorcycles.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="text-xs font-medium text-gray-500">Active Filters:</span>
+              {selectedMotorcycles.map(motorcycleId => {
+                const motorcycle = motorcycles.find(m => m.id === motorcycleId);
+                return motorcycle ? (
+                  <div 
+                    key={motorcycleId}
+                    className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md"
+                  >
+                    <span>{motorcycle.name}</span>
+                    <button 
+                      className="ml-1.5 text-blue-600 hover:text-blue-900"
+                      onClick={() => toggleMotorcycle(motorcycleId)}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : null;
+              })}
+              <button 
+                className="text-xs text-blue-600 hover:text-blue-900 hover:underline"
+                onClick={() => setSelectedMotorcycles([])}
+              >
+                Clear All
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Calendar View */}

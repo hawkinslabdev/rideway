@@ -100,10 +100,17 @@ export default function Home() {
     }
   };
 
-  const openMileageModal = (motorcycleId: string, currentMileage: number | null) => {
-    setSelectedMotorcycle(motorcycleId);
-    setNewMileage(currentMileage?.toString() || "");
-    setShowMileageModal(true);
+  const openMileageModal = () => {
+    if (data.motorcycles.length > 0) {
+      // Default to first motorcycle in the list
+      const firstMotorcycle = data.motorcycles[0];
+      setSelectedMotorcycle(firstMotorcycle.id);
+      setNewMileage(firstMotorcycle.currentMileage?.toString() || "");
+      setShowMileageModal(true);
+    } else {
+      // No motorcycles available
+      setError("Please add a motorcycle first");
+    }
   };
 
   if (loading) {
@@ -173,15 +180,8 @@ export default function Home() {
               </Link>
             ) : (
               <>
-                <Link 
-                  href="/garage/add" 
-                  className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                >
-                  <Bike size={16} className="mr-1.5" />
-                  Add Motorcycle
-                </Link>
                 <button 
-                  onClick={() => openMileageModal(data.motorcycles[0].id, data.motorcycles[0].currentMileage)}
+                  onClick={openMileageModal}
                   className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                 >
                   <Gauge size={16} className="mr-1.5" />
@@ -253,6 +253,77 @@ export default function Home() {
             <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">maintenance tasks</p>
           </div>
         </div>
+
+        {/* Mileage Update Modal */}
+        {showMileageModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium mb-4">Update Mileage</h3>
+              <form onSubmit={handleMileageUpdate}>
+                <div className="mb-4">
+                  <label htmlFor="motorcycleSelect" className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Motorcycle
+                  </label>
+                  <select
+                    id="motorcycleSelect"
+                    value={selectedMotorcycle}
+                    onChange={(e) => {
+                      const selected = data.motorcycles.find(m => m.id === e.target.value);
+                      setSelectedMotorcycle(e.target.value);
+                      setNewMileage(selected?.currentMileage?.toString() || "");
+                    }}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  >
+                    {data.motorcycles.map(moto => (
+                      <option key={moto.id} value={moto.id}>
+                        {moto.name} ({moto.year} {moto.make} {moto.model})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Mileage
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      name="mileage"
+                      id="mileage"
+                      required
+                      min="0"
+                      step="1"
+                      value={newMileage}
+                      onChange={(e) => setNewMileage(e.target.value)}
+                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md"
+                      placeholder="Enter current mileage"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 sm:text-sm">
+                        {formatDistance(1).split(' ')[1]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowMileageModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Maintenance Table - Responsive Mobile Design */}
         <div className="bg-white rounded-lg shadow mb-4 md:mb-6 overflow-hidden">
@@ -450,7 +521,11 @@ export default function Home() {
                       </div>
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => openMileageModal(motorcycle.id, motorcycle.currentMileage)}
+                          onClick={() => {
+                            setSelectedMotorcycle(motorcycle.id);
+                            setNewMileage(motorcycle.currentMileage?.toString() || "");
+                            setShowMileageModal(true);
+                          }}
                           className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs md:text-sm hover:bg-gray-300"
                         >
                           Update
@@ -482,56 +557,6 @@ export default function Home() {
             )}
           </div>
         </div>
-
-        {/* Mileage Update Modal */}
-        {showMileageModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-medium mb-4">Update Mileage</h3>
-              <form onSubmit={handleMileageUpdate}>
-                <div className="mb-4">
-                  <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
-                    Current Mileage
-                  </label>
-                  <div className="mt-1 relative rounded-md shadow-sm">
-                    <input
-                      type="number"
-                      name="mileage"
-                      id="mileage"
-                      required
-                      min="0"
-                      step="1"
-                      value={newMileage}
-                      onChange={(e) => setNewMileage(e.target.value)}
-                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md"
-                      placeholder="Enter current mileage"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">
-                        {formatDistance(1).split(' ')[1]}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowMileageModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </main>
     </ClientLayout>
   );
