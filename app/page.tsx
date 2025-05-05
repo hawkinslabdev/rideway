@@ -406,7 +406,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {data.upcomingMaintenance.map((task) => (
+              {data.upcomingMaintenance.map((task) => (
                   <tr key={task.id} className={`hover:bg-gray-50 ${task.isDue ? 'bg-red-50' : ''}`}>
                     <td className="px-6 py-4">{task.motorcycle}</td>
                     <td className="px-6 py-4">{task.task}</td>
@@ -414,12 +414,32 @@ export default function Home() {
                       {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "N/A"}
                     </td>
                     <td className="px-6 py-4">
-                      {task.dueMileage ? formatDistance(task.dueMileage) : "N/A"}
-                      {task.currentMileage && task.dueMileage && (
-                        task.currentMileage < task.dueMileage ? 
-                          ` (${formatDistance(task.dueMileage - task.currentMileage)} left)` : 
-                          ` (${formatDistance(task.currentMileage - task.dueMileage)} overdue)`
-                      )}
+                      {/* Enhanced display showing both absolute and relative values */}
+                      {task.dueMileage ? (
+                        <div>
+                          <span className="font-medium">{formatDistance(task.dueMileage)}</span>
+                          {task.currentMileage && task.dueMileage && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {task.currentMileage < task.dueMileage ? (
+                                <>
+                                  <span className="font-medium text-green-600">
+                                    {formatDistance(task.dueMileage - task.currentMileage)} remaining
+                                  </span>
+                                  {task.intervalMiles && (
+                                    <span className="ml-1">
+                                      ({Math.round(((task.intervalMiles - (task.dueMileage - task.currentMileage)) / task.intervalMiles) * 100)}% complete)
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="font-medium text-red-600">
+                                  {formatDistance(task.currentMileage - task.dueMileage)} overdue
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : "N/A"}
                     </td>
                     <td className="px-6 py-4">
                       <span

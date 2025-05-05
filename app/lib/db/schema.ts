@@ -1,14 +1,16 @@
+// app/lib/db/schema.ts
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 // Users table
 export const users = sqliteTable("users", {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    email: text("email").notNull().unique(),
-    password: text("password"), // Add this line
-    createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
-  });
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  password: text("password"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
+});
+
 // Motorcycles table
 export const motorcycles = sqliteTable("motorcycles", {
   id: text("id").primaryKey(),
@@ -33,18 +35,13 @@ export const maintenanceTasks = sqliteTable("maintenance_tasks", {
   motorcycleId: text("motorcycle_id").notNull().references(() => motorcycles.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  
-  // Interval settings
-  intervalMiles: integer("interval_miles"),  // The interval in kilometers/miles
-  intervalDays: integer("interval_days"),    // The interval in days
-  
-  // New fields for scheduling approach
-  baseOdometer: integer("base_odometer"),    // Odometer reading to base calculations from
-  nextDueOdometer: integer("next_due_odometer"), // Absolute odometer reading when next due
-  baseDate: integer("base_date", { mode: "timestamp" }), // Date to base calculations from
-  nextDueDate: integer("next_due_date", { mode: "timestamp" }), // Absolute date when next due
-  
-  priority: text("priority").default("medium"), // low, medium, high
+  intervalMiles: integer("interval_miles"),
+  intervalDays: integer("interval_days"),
+  baseOdometer: integer("base_odometer"),
+  nextDueOdometer: integer("next_due_odometer"),
+  baseDate: integer("base_date", { mode: "timestamp" }),
+  nextDueDate: integer("next_due_date", { mode: "timestamp" }),
+  priority: text("priority").default("medium"),
   isRecurring: integer("is_recurring", { mode: "boolean" }).default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
@@ -55,15 +52,14 @@ export const maintenanceRecords = sqliteTable("maintenance_records", {
   motorcycleId: text("motorcycle_id").notNull().references(() => motorcycles.id, { onDelete: "cascade" }),
   taskId: text("task_id").references(() => maintenanceTasks.id),
   date: integer("date", { mode: "timestamp" }).notNull(),
-  mileage: integer("mileage"),            // Odometer when maintenance was performed
+  mileage: integer("mileage"),
   cost: real("cost"),
   notes: text("notes"),
   receiptUrl: text("receipt_url"),
-  // New fields to help with interval tracking
-  isScheduled: integer("is_scheduled", { mode: "boolean" }).default(true), // Was this a scheduled task?
-  resetsInterval: integer("resets_interval", { mode: "boolean" }).default(true), // Does this reset the maintenance interval?
-  nextDueOdometer: integer("next_due_odometer"), // Calculated next due odometer after this service
-  nextDueDate: integer("next_due_date", { mode: "timestamp" }), // Calculated next due date after this service
+  isScheduled: integer("is_scheduled", { mode: "boolean" }).default(true),
+  resetsInterval: integer("resets_interval", { mode: "boolean" }).default(true),
+  nextDueOdometer: integer("next_due_odometer"),
+  nextDueDate: integer("next_due_date", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
 

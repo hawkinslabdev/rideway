@@ -142,6 +142,61 @@ export async function PATCH(
         );
       }
     }
+    
+    // Get current motorcycle for calculations
+    const currentMotorcycle = body.motorcycleId && body.motorcycleId !== task.motorcycleId
+      ? await db.query.motorcycles.findFirst({
+          where: eq(motorcycles.id, body.motorcycleId),
+        })
+      : motorcycle;
+    
+    if (!currentMotorcycle) {
+      return NextResponse.json(
+        { error: "Motorcycle not found" },
+        { status: 404 }
+      );
+    }
+    
+    const currentOdometer = currentMotorcycle.currentMileage || 0;
+    
+    // Determine next due mileage
+    let nextDueOdometer = task.nextDueOdometer;
+    let intervalMiles = body.intervalMiles !== undefined ? body.intervalMiles : task.intervalMiles;
+    
+    // If explicit nextDueMileage is provided, use that
+    if (body.nextDueMileage) {
+      nextDueOdometer = body.nextDueMileage;
+      
+      // Validate that the next due mileage is greater than current mileage
+      if (nextDueOdometer <= currentOdometer) {
+        return NextResponse.json(
+          { error: "Next due mileage must be greater than current motorcycle mileage" },
+          { status: 400 }
+        );
+      }
+      
+      // Calculate the implied interval if we have a nextDueMileage
+      if (currentOdometer > 0) {
+        intervalMiles = nextDueOdometer - currentOdometer;
+      }
+    } 
+    // Otherwise calculate from interval
+    else if (body.intervalMiles) {
+      nextDueOdometer = currentOdometer + body.intervalMiles;
+    }
+    
+    // Calculate next due date
+    let nextDueDate = task.nextDueDate;
+    const now = new Date();
+    
+    if (body.intervalDays !== undefined) {
+      if (body.intervalDays) {
+        nextDueDate = new Date(now);
+        nextDueDate.setDate(nextDueDate.getDate() + body.intervalDays);
+      } else {
+        nextDueDate = null;
+      }
+    }
 
     // Update the task
     const updatedTask = await db
@@ -149,11 +204,17 @@ export async function PATCH(
       .set({
         motorcycleId: body.motorcycleId || task.motorcycleId,
         name: body.name,
-        description: body.description,
-        intervalMiles: body.intervalMiles !== undefined ? body.intervalMiles : task.intervalMiles,
+        description: body.description !== undefined ? body.description : task.description,
+        intervalMiles: intervalMiles,
         intervalDays: body.intervalDays !== undefined ? body.intervalDays : task.intervalDays,
         priority: body.priority || task.priority,
         isRecurring: body.isRecurring !== undefined ? body.isRecurring : task.isRecurring,
+        
+        // Update the hybrid tracking fields
+        baseOdometer: currentOdometer,
+        nextDueOdometer: nextDueOdometer,
+        baseDate: now,
+        nextDueDate: nextDueDate
       })
       .where(eq(maintenanceTasks.id, id))
       .returning();

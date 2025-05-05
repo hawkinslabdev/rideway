@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c3551c6b-56bc-4507-b467-4f6c892c2001",
+  "id": "786fd9b2-5fb8-44f9-96be-bd478d611422",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "maintenance_records": {
@@ -63,13 +63,43 @@
           "notNull": false,
           "autoincrement": false
         },
+        "is_scheduled": {
+          "name": "is_scheduled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "resets_interval": {
+          "name": "resets_interval",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "next_due_odometer": {
+          "name": "next_due_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_due_date": {
+          "name": "next_due_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-05-04T11:46:28.426Z\"'"
+          "default": "'\"2025-05-05T15:23:52.469Z\"'"
         }
       },
       "indexes": {},
@@ -150,6 +180,34 @@
           "notNull": false,
           "autoincrement": false
         },
+        "base_odometer": {
+          "name": "base_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_due_odometer": {
+          "name": "next_due_odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "base_date": {
+          "name": "base_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_due_date": {
+          "name": "next_due_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "priority": {
           "name": "priority",
           "type": "text",
@@ -172,7 +230,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-05-04T11:46:28.426Z\"'"
+          "default": "'\"2025-05-05T15:23:52.469Z\"'"
         }
       },
       "indexes": {},
@@ -288,7 +346,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-05-04T11:46:28.426Z\"'"
+          "default": "'\"2025-05-05T15:23:52.468Z\"'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -296,7 +354,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-05-04T11:46:28.426Z\"'"
+          "default": "'\"2025-05-05T15:23:52.468Z\"'"
         }
       },
       "indexes": {},
@@ -356,7 +414,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-05-04T11:46:28.425Z\"'"
+          "default": "'\"2025-05-05T15:23:52.468Z\"'"
         }
       },
       "indexes": {

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ClientLayout from "../../components/ClientLayout";
 import Link from "next/link";
-import { ArrowLeft, Plus, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, AlertCircle, Info } from "lucide-react";
 import { useSettings } from "../../contexts/SettingsContext";
 import { DistanceUtil } from "../../lib/utils/distance";
 
@@ -27,12 +27,18 @@ export default function AddMaintenancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
+  const [selectedMotorcycle, setSelectedMotorcycle] = useState<Motorcycle | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  
+  // Track the type of mileage entry
+  const [mileageType, setMileageType] = useState<'interval' | 'absolute'>('interval');
   
   const [formData, setFormData] = useState({
     motorcycleId: "",
     name: "",
     description: "",
-    intervalMiles: "",
+    intervalMiles: "",      // For interval-based tracking
+    nextDueMileage: "",     // For absolute tracking
     intervalDays: "",
     priority: "medium",
     isRecurring: true,
@@ -52,9 +58,11 @@ export default function AddMaintenancePage() {
         
         // Set default motorcycle if available
         if (data.motorcycles.length > 0) {
+          const defaultMotorcycle = data.motorcycles[0];
+          setSelectedMotorcycle(defaultMotorcycle);
           setFormData(prev => ({
             ...prev,
-            motorcycleId: data.motorcycles[0].id
+            motorcycleId: defaultMotorcycle.id
           }));
         }
       } catch (err) {
@@ -66,6 +74,31 @@ export default function AddMaintenancePage() {
 
     fetchMotorcycles();
   }, []);
+
+  // Update selected motorcycle when motorcycleId changes
+  useEffect(() => {
+    const motorcycle = motorcycles.find(m => m.id === formData.motorcycleId);
+    setSelectedMotorcycle(motorcycle || null);
+  }, [formData.motorcycleId, motorcycles]);
+
+  // Calculate the next due mileage based on interval for the help text
+  const calculateNextDueMileage = () => {
+    if (!selectedMotorcycle || selectedMotorcycle.currentMileage === null) {
+      return "unknown";
+    }
+    
+    const intervalMiles = DistanceUtil.parseInput(formData.intervalMiles);
+    if (intervalMiles === null) {
+      return "unknown";
+    }
+    
+    const nextDueMileage = selectedMotorcycle.currentMileage + intervalMiles;
+    return formatDistance(nextDueMileage);
+  };
+
+  const formatDistance = (value: number) => {
+    return `${value} ${unitLabel}`;
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -87,6 +120,10 @@ export default function AddMaintenancePage() {
     }
   };
 
+  const handleMileageTypeChange = (type: 'interval' | 'absolute') => {
+    setMileageType(type);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -100,9 +137,9 @@ export default function AddMaintenancePage() {
       return;
     }
     
-    // Either interval miles or days should be provided
-    if (formData.intervalMiles === "" && formData.intervalDays === "") {
-      setError("Please provide either a mileage interval or a time interval");
+    // Either interval miles, absolute mileage, or days should be provided
+    if (formData.intervalMiles === "" && formData.nextDueMileage === "" && formData.intervalDays === "") {
+      setError("Please provide either a mileage value or a time interval");
       return;
     }
     
@@ -110,9 +147,29 @@ export default function AddMaintenancePage() {
     setError(null);
     
     try {
-      // Convert the mileage interval from display units to storage units (km)
-      const displayIntervalMiles = DistanceUtil.parseInput(formData.intervalMiles);
-      const storageIntervalMiles = DistanceUtil.toStorageUnits(displayIntervalMiles, settings.units);
+      // Determine which mileage value to use based on selected type
+      let intervalMiles: number | null = null;
+      let absoluteMileage: number | null = null;
+      
+      if (mileageType === 'interval') {
+        // For interval-based tracking, convert interval to storage units
+        intervalMiles = DistanceUtil.parseInput(formData.intervalMiles);
+        intervalMiles = DistanceUtil.toStorageUnits(intervalMiles, settings.units);
+      } else {
+        // For absolute tracking, convert absolute value to storage units
+        absoluteMileage = DistanceUtil.parseInput(formData.nextDueMileage);
+        absoluteMileage = DistanceUtil.toStorageUnits(absoluteMileage, settings.units);
+        
+        // Calculate the interval from current mileage
+        if (selectedMotorcycle && selectedMotorcycle.currentMileage !== null && absoluteMileage !== null) {
+          intervalMiles = absoluteMileage - selectedMotorcycle.currentMileage;
+          
+          // Validate that the next due mileage is greater than current
+          if (intervalMiles <= 0) {
+            throw new Error("Next due mileage must be greater than current motorcycle mileage");
+          }
+        }
+      }
       
       const response = await fetch("/api/maintenance/task", {
         method: "POST",
@@ -123,7 +180,8 @@ export default function AddMaintenancePage() {
           motorcycleId: formData.motorcycleId,
           name: formData.name,
           description: formData.description || null,
-          intervalMiles: storageIntervalMiles, // Store interval in kilometers
+          intervalMiles: intervalMiles,  // Pass the calculated interval
+          nextDueMileage: absoluteMileage, // Pass the absolute value if entered
           intervalDays: formData.intervalDays ? parseInt(formData.intervalDays) : null,
           priority: formData.priority,
           isRecurring: formData.isRecurring,
@@ -228,6 +286,11 @@ export default function AddMaintenancePage() {
                       </option>
                     ))}
                   </select>
+                  {selectedMotorcycle && selectedMotorcycle.currentMileage !== null && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Current mileage: {formatDistance(selectedMotorcycle.currentMileage)}
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -261,54 +324,136 @@ export default function AddMaintenancePage() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="intervalMiles" className="block text-sm font-medium text-gray-700">
-                      Mileage Interval ({unitLabel})
-                    </label>
-                    <div className="mt-1 flex rounded-md shadow-sm">
-                      <input
-                        type="number"
-                        name="intervalMiles"
-                        id="intervalMiles"
-                        min="1"
-                        value={formData.intervalMiles}
-                        onChange={handleChange}
-                        className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder={`e.g., 3000 ${unitLabel}`}
-                      />
-                      <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                        {unitLabel}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      How often this task needs to be done based on mileage
-                    </p>
+                {/* Mileage Tracking Options */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                  <div className="flex items-start mb-4">
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      Mileage Tracking
+                      <button 
+                        type="button" 
+                        onClick={() => setShowInfoModal(true)}
+                        className="ml-1 text-blue-500 hover:text-blue-700"
+                      >
+                        <Info size={16} />
+                      </button>
+                    </h3>
                   </div>
                   
-                  <div>
-                    <label htmlFor="intervalDays" className="block text-sm font-medium text-gray-700">
-                      Time Interval
-                    </label>
-                    <div className="mt-1 flex rounded-md shadow-sm">
-                      <input
-                        type="number"
-                        name="intervalDays"
-                        id="intervalDays"
-                        min="1"
-                        value={formData.intervalDays}
-                        onChange={handleChange}
-                        className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="e.g., 180"
-                      />
-                      <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                        days
-                      </span>
+                  <div className="space-y-4">
+                    {/* Tracking type toggle */}
+                    <div className="flex gap-4">
+                      <div className="flex items-center">
+                        <input
+                          id="interval-tracking"
+                          name="mileage-tracking-type"
+                          type="radio"
+                          checked={mileageType === 'interval'}
+                          onChange={() => handleMileageTypeChange('interval')}
+                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <label htmlFor="interval-tracking" className="ml-2 block text-sm font-medium text-gray-700">
+                          Interval Based
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center">
+                        <input
+                          id="absolute-tracking"
+                          name="mileage-tracking-type"
+                          type="radio"
+                          checked={mileageType === 'absolute'}
+                          onChange={() => handleMileageTypeChange('absolute')}
+                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <label htmlFor="absolute-tracking" className="ml-2 block text-sm font-medium text-gray-700">
+                          Absolute Value
+                        </label>
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      How often this task needs to be done based on time
-                    </p>
+                    
+                    {/* Mileage input based on selected type */}
+                    {mileageType === 'interval' ? (
+                      <div>
+                        <label htmlFor="intervalMiles" className="block text-sm font-medium text-gray-700">
+                          Mileage Interval (Every X {unitLabel})
+                        </label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="number"
+                            name="intervalMiles"
+                            id="intervalMiles"
+                            min="1"
+                            value={formData.intervalMiles}
+                            onChange={handleChange}
+                            className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder={`e.g., 3000 ${unitLabel}`}
+                          />
+                          <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                            {unitLabel}
+                          </span>
+                        </div>
+                        {selectedMotorcycle && selectedMotorcycle.currentMileage !== null && formData.intervalMiles && (
+                          <p className="mt-1 text-xs text-gray-600">
+                            Next due at approximately: {calculateNextDueMileage()}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <label htmlFor="nextDueMileage" className="block text-sm font-medium text-gray-700">
+                          Due At Specific Odometer Reading
+                        </label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="number"
+                            name="nextDueMileage"
+                            id="nextDueMileage"
+                            min={selectedMotorcycle?.currentMileage ? selectedMotorcycle.currentMileage + 1 : 1}
+                            value={formData.nextDueMileage}
+                            onChange={handleChange}
+                            className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder={`e.g., 10000 ${unitLabel}`}
+                          />
+                          <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                            {unitLabel}
+                          </span>
+                        </div>
+                        {selectedMotorcycle && selectedMotorcycle.currentMileage !== null && formData.nextDueMileage && (
+                          <p className="mt-1 text-xs text-gray-600">
+                            {parseInt(formData.nextDueMileage) > selectedMotorcycle.currentMileage ? (
+                              `That's ${parseInt(formData.nextDueMileage) - selectedMotorcycle.currentMileage} ${unitLabel} from now`
+                            ) : (
+                              <span className="text-red-600">Value must be greater than current mileage</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="intervalDays" className="block text-sm font-medium text-gray-700">
+                    Time Interval (Optional)
+                  </label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      name="intervalDays"
+                      id="intervalDays"
+                      min="1"
+                      value={formData.intervalDays}
+                      onChange={handleChange}
+                      className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="e.g., 180"
+                    />
+                    <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                      days
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    How often this task needs to be done based on time
+                  </p>
                 </div>
                 
                 <div>
@@ -372,6 +517,37 @@ export default function AddMaintenancePage() {
             </div>
           </div>
         </div>
+        
+        {/* Info Modal */}
+        {showInfoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium mb-4">Mileage Tracking Options</h3>
+              <div className="space-y-4 text-sm">
+                <p>
+                  <strong>Interval Based:</strong> Track maintenance by specifying how often it should be done (e.g., "every 3,000 miles"). 
+                  The system will automatically calculate the next due mileage based on when you last performed the maintenance.
+                </p>
+                <p>
+                  <strong>Absolute Value:</strong> Track maintenance by specifying an exact odometer reading (e.g., "due at 10,000 miles"). 
+                  This is useful for manufacturer-specified maintenance at specific mileage points.
+                </p>
+                <p className="text-gray-600 italic">
+                  Both methods will track your progress through the maintenance interval, but allow you to choose how to define when maintenance is due.
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowInfoModal(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </ClientLayout>
   );

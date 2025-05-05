@@ -48,8 +48,8 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
     return "border-gray-200";
   };
 
-  // Function to format the due information
-  const getDueInfo = () => {
+  // Function to format the absolute due information
+  const getAbsoluteDueInfo = () => {
     if (!task.dueMileage && !task.dueDate) {
       return "No due date or mileage set";
     }
@@ -59,14 +59,6 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
     if (task.dueMileage) {
       const formattedMileage = formatDistance(task.dueMileage);
       dueInfo += `Due at ${formattedMileage}`;
-      
-      if (task.remainingMiles !== null) {
-        if (task.remainingMiles > 0) {
-          dueInfo += ` (${formatDistance(task.remainingMiles)} remaining)`;
-        } else {
-          dueInfo += " (Overdue)";
-        }
-      }
     }
     
     if (task.dueDate) {
@@ -77,6 +69,19 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
     }
     
     return dueInfo;
+  };
+  
+  // Function to format the relative progress information
+  const getRelativeInfo = () => {
+    if (task.remainingMiles === null) {
+      return null;
+    }
+    
+    if (task.remainingMiles <= 0) {
+      return "Overdue";
+    }
+    
+    return `${formatDistance(task.remainingMiles)} remaining`;
   };
 
   if (compact) {
@@ -137,6 +142,7 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
       )}
       
       <div className="mb-3 text-sm">
+        {/* Absolute due information */}
         <p className="flex items-center mb-1">
           {task.isDue ? (
             <AlertTriangle size={14} className="mr-1 text-red-500" />
@@ -144,9 +150,18 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
             <Wrench size={14} className="mr-1 text-gray-500" />
           )}
           <span className={task.isDue ? "text-red-700 font-medium" : "text-gray-700"}>
-            {getDueInfo()}
+            {getAbsoluteDueInfo()}
           </span>
         </p>
+        
+        {/* Relative progress information */}
+        {getRelativeInfo() && (
+          <p className="flex items-center text-sm ml-6 mt-1">
+            <span className={task.isDue ? "text-red-600 font-medium" : "text-gray-600"}>
+              {getRelativeInfo()}
+            </span>
+          </p>
+        )}
         
         {(task.completionPercentage !== null && task.completionPercentage >= 0) && (
           <>

@@ -55,9 +55,27 @@ export async function POST(request: Request) {
     const currentDate = new Date();
     const currentOdometer = motorcycle.currentMileage || 0;
     
-    // Calculate next due values
-    const nextDueOdometer = body.intervalMiles ? currentOdometer + body.intervalMiles : null;
+    // Determine next due mileage
+    let nextDueOdometer = null;
     
+    // If explicit nextDueMileage is provided, use that
+    if (body.nextDueMileage) {
+      nextDueOdometer = body.nextDueMileage;
+      
+      // Validate that the next due mileage is greater than current mileage
+      if (nextDueOdometer <= currentOdometer) {
+        return NextResponse.json(
+          { error: "Next due mileage must be greater than current motorcycle mileage" },
+          { status: 400 }
+        );
+      }
+    } 
+    // Otherwise calculate from interval
+    else if (body.intervalMiles) {
+      nextDueOdometer = currentOdometer + body.intervalMiles;
+    }
+    
+    // Calculate next due date
     let nextDueDate = null;
     if (body.intervalDays) {
       nextDueDate = new Date(currentDate);
@@ -89,6 +107,66 @@ export async function POST(request: Request) {
     console.error("Error creating maintenance task:", error);
     return NextResponse.json(
       { error: "Failed to create maintenance task" },
+      { status: 500 }
+    );
+  }
+}
+
+// Get a specific maintenance task
+export async function GET(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
+    // Extract task ID from query params
+    const url = new URL(request.url);
+    const taskId = url.searchParams.get("id");
+    
+    if (!taskId) {
+      return NextResponse.json(
+        { error: "Task ID is required" },
+        { status: 400 }
+      );
+    }
+    
+    // Get the task
+    const task = await db.query.maintenanceTasks.findFirst({
+      where: eq(maintenanceTasks.id, taskId),
+    });
+    
+    if (!task) {
+      return NextResponse.json(
+        { error: "Task not found" },
+        { status: 404 }
+      );
+    }
+    
+    // Verify motorcycle ownership
+    const motorcycle = await db.query.motorcycles.findFirst({
+      where: and(
+        eq(motorcycles.id, task.motorcycleId),
+        eq(motorcycles.userId, session.user.id)
+      ),
+    });
+    
+    if (!motorcycle) {
+      return NextResponse.json(
+        { error: "Unauthorized to access this task" },
+        { status: 401 }
+      );
+    }
+    
+    return NextResponse.json(task);
+  } catch (error) {
+    console.error("Error fetching maintenance task:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch maintenance task" },
       { status: 500 }
     );
   }

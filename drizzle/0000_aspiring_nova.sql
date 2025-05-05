@@ -7,7 +7,11 @@ CREATE TABLE `maintenance_records` (
 	`cost` real,
 	`notes` text,
 	`receipt_url` text,
-	`created_at` integer DEFAULT '"2025-05-04T11:46:28.426Z"' NOT NULL,
+	`is_scheduled` integer DEFAULT true,
+	`resets_interval` integer DEFAULT true,
+	`next_due_odometer` integer,
+	`next_due_date` integer,
+	`created_at` integer DEFAULT '"2025-05-05T15:23:52.469Z"' NOT NULL,
 	FOREIGN KEY (`motorcycle_id`) REFERENCES `motorcycles`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`task_id`) REFERENCES `maintenance_tasks`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -19,9 +23,13 @@ CREATE TABLE `maintenance_tasks` (
 	`description` text,
 	`interval_miles` integer,
 	`interval_days` integer,
+	`base_odometer` integer,
+	`next_due_odometer` integer,
+	`base_date` integer,
+	`next_due_date` integer,
 	`priority` text DEFAULT 'medium',
 	`is_recurring` integer DEFAULT true,
-	`created_at` integer DEFAULT '"2025-05-04T11:46:28.426Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2025-05-05T15:23:52.469Z"' NOT NULL,
 	FOREIGN KEY (`motorcycle_id`) REFERENCES `motorcycles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -38,8 +46,8 @@ CREATE TABLE `motorcycles` (
 	`color` text,
 	`image_url` text,
 	`notes` text,
-	`created_at` integer DEFAULT '"2025-05-04T11:46:28.426Z"' NOT NULL,
-	`updated_at` integer DEFAULT '"2025-05-04T11:46:28.426Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2025-05-05T15:23:52.468Z"' NOT NULL,
+	`updated_at` integer DEFAULT '"2025-05-05T15:23:52.468Z"' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -48,7 +56,7 @@ CREATE TABLE `users` (
 	`name` text NOT NULL,
 	`email` text NOT NULL,
 	`password` text,
-	`created_at` integer DEFAULT '"2025-05-04T11:46:28.425Z"' NOT NULL
+	`created_at` integer DEFAULT '"2025-05-05T15:23:52.468Z"' NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);
