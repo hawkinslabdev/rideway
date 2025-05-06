@@ -71,53 +71,6 @@ export default function Sidebar() {
     router.push("/auth/signin");
   };
 
-  const handleExportDatabase = async () => {
-    try {
-      const response = await fetch("/api/user/export");
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `rideway-backup-${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert("Failed to export data. Please try again.");
-    }
-  };
-
-  const handleImportDatabase = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const fileContent = await file.text();
-      const data = JSON.parse(fileContent);
-
-      const response = await fetch("/api/user/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) throw new Error("Import failed");
-
-      const result = await response.json();
-      alert(`Successfully imported ${result.importedMotorcycles} motorcycles!`);
-      window.location.reload();
-    } catch (error) {
-      console.error("Import failed:", error);
-      alert("Failed to import data. Please make sure the file is valid.");
-    }
-
-    if (event.target) event.target.value = "";
-  };
-
   return (
     <>
       {/* Mobile menu button - only visible on mobile */}
@@ -224,29 +177,6 @@ export default function Sidebar() {
                     <Settings size={16} className="mr-3" />
                     Settings
                   </Link>
-                  
-                  {/* Import/Export */}
-                  <div className="pt-2 pb-1">
-                    <div className="px-4 text-xs font-semibold text-gray-400">Data Management</div>
-                    <button
-                      onClick={handleExportDatabase}
-                      className="w-full flex items-center px-4 py-2 mt-1 text-sm text-gray-300 hover:bg-gray-700 rounded-md"
-                    >
-                      <Download size={16} className="mr-3" />
-                      Export Data
-                    </button>
-                    <label className="w-full flex items-center px-4 py-2 mt-1 text-sm text-gray-300 hover:bg-gray-700 rounded-md cursor-pointer">
-                      <Upload size={16} className="mr-3" />
-                      Import Data
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".json"
-                        className="hidden"
-                        onChange={handleImportDatabase}
-                      />
-                    </label>
-                  </div>
                   
                   <div className="pt-2">
                     <button

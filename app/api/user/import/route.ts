@@ -50,8 +50,10 @@ export async function POST(request: Request) {
         currentMileage: motorcycle.currentMileage,
         imageUrl: motorcycle.imageUrl,
         notes: motorcycle.notes,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        isOwned: motorcycle.isOwned !== undefined ? motorcycle.isOwned : true,
+        isDefault: motorcycle.isDefault !== undefined ? motorcycle.isDefault : false,
+        createdAt: motorcycle.createdAt ? new Date(motorcycle.createdAt) : new Date(),
+        updatedAt: motorcycle.updatedAt ? new Date(motorcycle.updatedAt) : new Date(),
       });
 
       // Import maintenance tasks for this motorcycle
@@ -59,6 +61,22 @@ export async function POST(request: Request) {
         for (const task of motorcycle.maintenanceTasks) {
           const newTaskId = randomUUID();
           taskIdMap.set(task.id, newTaskId);
+
+          // Calculate next due values
+          const currentDate = new Date();
+          const baseDate = currentDate;
+          const baseOdometer = motorcycle.currentMileage || 0;
+          
+          let nextDueOdometer = null;
+          if (task.intervalMiles && baseOdometer !== null) {
+            nextDueOdometer = baseOdometer + task.intervalMiles;
+          }
+          
+          let nextDueDate = null;
+          if (task.intervalDays) {
+            nextDueDate = new Date(baseDate);
+            nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+          }
 
           await db.insert(maintenanceTasks).values({
             id: newTaskId,
@@ -69,7 +87,12 @@ export async function POST(request: Request) {
             intervalDays: task.intervalDays,
             priority: task.priority,
             isRecurring: task.isRecurring,
-            createdAt: new Date(),
+            archived: task.archived !== undefined ? task.archived : false,
+            baseOdometer: baseOdometer,
+            baseDate: baseDate,
+            nextDueOdometer: nextDueOdometer,
+            nextDueDate: nextDueDate,
+            createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
           });
         }
       }
@@ -80,6 +103,24 @@ export async function POST(request: Request) {
           // Map the old task ID to the new task ID if it exists
           const newTaskId = record.taskId ? taskIdMap.get(record.taskId) : null;
 
+          // Calculate next due values if the associated task exists
+          let nextDueOdometer = null;
+          let nextDueDate = null;
+          
+          if (newTaskId) {
+            const task = motorcycle.maintenanceTasks.find((t: { id: string }) => t.id === record.taskId);
+            if (task) {
+              if (task.intervalMiles && record.mileage) {
+                nextDueOdometer = record.mileage + task.intervalMiles;
+              }
+              
+              if (task.intervalDays && record.date) {
+                nextDueDate = new Date(record.date);
+                nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+              }
+            }
+          }
+
           await db.insert(maintenanceRecords).values({
             id: randomUUID(),
             motorcycleId: newMotorcycleId,
@@ -89,10 +130,27 @@ export async function POST(request: Request) {
             cost: record.cost,
             notes: record.notes,
             receiptUrl: record.receiptUrl,
-            createdAt: new Date(),
+            isScheduled: record.isScheduled !== undefined ? record.isScheduled : true,
+            resetsInterval: record.resetsInterval !== undefined ? record.resetsInterval : true,
+            nextDueOdometer: nextDueOdometer,
+            nextDueDate: nextDueDate,
+            createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
           });
         }
       }
+    }
+
+    // Ensure one motorcycle is set as default if none are marked
+    const importedMotorcycles = await db.query.motorcycles.findMany({
+      where: eq(motorcycles.userId, session.user.id),
+    });
+    
+    const hasDefault = importedMotorcycles.some(m => m.isDefault);
+    
+    if (!hasDefault && importedMotorcycles.length > 0) {
+      await db.update(motorcycles)
+        .set({ isDefault: true })
+        .where(eq(motorcycles.id, importedMotorcycles[0].id));
     }
 
     return NextResponse.json({ 
