@@ -47,7 +47,12 @@ export async function POST(request: Request) {
     const currentMileage = body.currentMileage 
       ? parseInt(body.currentMileage) 
       : null;
-    
+      
+    const existingMotorcycles = await db.query.motorcycles.findMany({
+     where: eq(motorcycles.userId, session.user.id),
+    });
+    const isDefault = existingMotorcycles.length === 0;
+
     const newMotorcycle = await db.insert(motorcycles).values({
       id: randomUUID(),
       userId: session.user.id,
@@ -61,6 +66,8 @@ export async function POST(request: Request) {
       currentMileage: currentMileage,
       imageUrl: body.imageUrl || null,
       notes: body.notes || null,
+      isDefault: isDefault,
+      isOwned: true, 
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();

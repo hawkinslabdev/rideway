@@ -25,6 +25,8 @@ export const motorcycles = sqliteTable("motorcycles", {
   color: text("color"),
   imageUrl: text("image_url"),
   notes: text("notes"),
+  isOwned: integer("isOwned", { mode: "boolean" }).default(true),
+  isDefault: integer("isDefault", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
@@ -79,11 +81,9 @@ export const maintenanceTasksRelations = relations(maintenanceTasks, ({ one, man
     fields: [maintenanceTasks.motorcycleId],
     references: [motorcycles.id],
   }),
-  records: many(maintenanceRecords, {
-    fields: [maintenanceTasks.id],
-    references: [maintenanceRecords.taskId],
-  }),
+  records: many(maintenanceRecords),
 }));
+
 
 export const maintenanceRecordsRelations = relations(maintenanceRecords, ({ one }) => ({
   motorcycle: one(motorcycles, {

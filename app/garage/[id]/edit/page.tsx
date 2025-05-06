@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Camera } from "lucide-react";
+import { ArrowLeft, Save, Camera, Archive } from "lucide-react";
 import Sidebar from "../../../components/Sidebar";
 
 export default function EditMotorcycle({ params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +13,8 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
   const [motorcycleId, setMotorcycleId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showOwnershipModal, setShowOwnershipModal] = useState(false);
+  const [motorcycle, setMotorcycle] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -42,39 +44,41 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
   // Fetch current motorcycle data
   useEffect(() => {
     if (!motorcycleId) return;
-
-    const fetchMotorcycle = async () => {
-      try {
-        const response = await fetch(`/api/motorcycles/${motorcycleId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch motorcycle");
-        }
-        const data = await response.json();
-        const motorcycle = data.motorcycle;
-        
-        setFormData({
-          name: motorcycle.name || "",
-          make: motorcycle.make || "",
-          model: motorcycle.model || "",
-          year: motorcycle.year || new Date().getFullYear(),
-          vin: motorcycle.vin || "",
-          color: motorcycle.color || "",
-          purchaseDate: motorcycle.purchaseDate ? motorcycle.purchaseDate.split('T')[0] : "",
-          currentMileage: motorcycle.currentMileage?.toString() || "",
-          notes: motorcycle.notes || "",
-          imageUrl: motorcycle.imageUrl || "",
-        });
-        
-        if (motorcycle.imageUrl) {
-          setImagePreview(motorcycle.imageUrl);
-        }
-      } catch (err) {
-        setError("Failed to load motorcycle data");
-      }
-    };
-
     fetchMotorcycle();
   }, [motorcycleId]);
+
+  const fetchMotorcycle = async () => {
+    try {
+      const response = await fetch(`/api/motorcycles/${motorcycleId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch motorcycle");
+      }
+      const data = await response.json();
+      const motorcycle = data.motorcycle;
+      
+      // Store the full motorcycle object
+      setMotorcycle(motorcycle);
+      
+      setFormData({
+        name: motorcycle.name || "",
+        make: motorcycle.make || "",
+        model: motorcycle.model || "",
+        year: motorcycle.year || new Date().getFullYear(),
+        vin: motorcycle.vin || "",
+        color: motorcycle.color || "",
+        purchaseDate: motorcycle.purchaseDate ? motorcycle.purchaseDate.split('T')[0] : "",
+        currentMileage: motorcycle.currentMileage?.toString() || "",
+        notes: motorcycle.notes || "",
+        imageUrl: motorcycle.imageUrl || "",
+      });
+      
+      if (motorcycle.imageUrl) {
+        setImagePreview(motorcycle.imageUrl);
+      }
+    } catch (err) {
+      setError("Failed to load motorcycle data");
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -82,6 +86,36 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleToggleOwnership = async () => {
+    if (!motorcycleId || !motorcycle) return;
+    
+    setLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch("/api/motorcycles/ownership", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          motorcycleId, 
+          isOwned: !motorcycle.isOwned 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update ownership status");
+      }
+      
+      // Redirect back to the motorcycle details page
+      router.push(`/garage/${motorcycleId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update ownership status");
+      setLoading(false);
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,24 +390,83 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end space-x-3">
-              <Link
-                href={`/garage/${motorcycleId}`}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </Link>
+            <div className="flex justify-between">
               <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                type="button"
+                onClick={() => setShowOwnershipModal(true)}
+                className={`inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
+                  motorcycle?.isOwned
+                    ? "border-amber-300 text-amber-600 bg-white hover:bg-amber-50"
+                    : "border-blue-300 text-blue-600 bg-white hover:bg-blue-50"
+                }`}
               >
-                <Save size={16} className="mr-2" />
-                {loading ? "Saving..." : "Save Changes"}
+                <Archive size={16} className="mr-2" />
+                {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
               </button>
+              
+              <div className="flex space-x-3">
+                <Link
+                  href={`/garage/${motorcycleId}`}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </Link>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <Save size={16} className="mr-2" />
+                  {loading ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
             </div>
           </form>
         </div>
+
+        {/* Ownership toggle modal */}
+        {showOwnershipModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium mb-2">
+                {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {motorcycle?.isOwned
+                  ? "Archiving will mark this motorcycle as no longer owned. It will still appear in your service history but will be hidden from the main garage view."
+                  : "Restoring will mark this motorcycle as currently owned and make it visible in your garage again."}
+              </p>
+              
+              {motorcycle?.isOwned && motorcycle?.isDefault && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  <strong>Note:</strong> This motorcycle is currently set as your default. Archiving it will remove this status.
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOwnershipModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleOwnership}
+                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                    motorcycle?.isOwned
+                      ? "bg-amber-600 hover:bg-amber-700"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                  disabled={loading}
+                >
+                  {loading ? "Processing..." : (motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

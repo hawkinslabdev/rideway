@@ -142,16 +142,13 @@ export async function GET(request: Request) {
     const motorcycleIds = userMotorcycles.map(m => m.id);
     
     // Create the base query condition
-    let tasksWhere: SQL<unknown> = inArray(maintenanceTasks.motorcycleId, motorcycleIds) || and();
-    
-    // If not including archived tasks, add archived=false condition
-    if (!includeArchived) {
-      tasksWhere = and(
-        tasksWhere,
-        eq(maintenanceTasks.archived, false)
-      );
+    let tasksWhere = inArray(maintenanceTasks.motorcycleId, motorcycleIds);
+
+    // In case motorcycleIds is empty, provide a fallback condition
+    if (motorcycleIds.length === 0) {
+      // This will intentionally match no records, but provide a valid SQL condition
+      tasksWhere = eq(maintenanceTasks.id, 'no-match-condition');
     }
-    
     // Get all maintenance tasks for all user's motorcycles
     const tasks = await db.query.maintenanceTasks.findMany({
       where: tasksWhere,
