@@ -32,6 +32,18 @@ We use modern web tech that just works:
 
 ## Get Started in 5 Minutes
 
+## Deployment
+
+### Heroku one-click deploy
+
+Deploying Chatwoot to Heroku is a breeze. It's as simple as clicking this button:
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/hawkinslabdev/rideway/tree/master)
+
+Follow the documentation to understand setting the correct environment variables for the app to work with all the features. There might be breakages if you do not set the relevant environment variables.
+
+### Other deployment options
+
 For now, you'll have to rely on using your own skills to set-up a server with the following commands. We're working on a Docker container. 
 
 1. **Clone the repo**
