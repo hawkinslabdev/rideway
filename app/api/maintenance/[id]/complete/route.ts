@@ -63,6 +63,7 @@ export async function POST(
     }
     
     // Get maintenance mileage (default to current motorcycle mileage if not provided)
+    
     const maintenanceMileage = body.mileage || motorcycle.currentMileage;
     const maintenanceDate = new Date();
     
@@ -74,9 +75,16 @@ export async function POST(
     let nextDueDate = null;
     
     if (resetSchedule) {
-      // Reset approach: calculate from current values
+      // Reset approach: calculate from current values based on intervalBase
       if (task.intervalMiles) {
-        nextDueOdometer = maintenanceMileage + task.intervalMiles;
+        if (task.intervalBase === 'zero') {
+          // For zero-based intervals, calculate how many intervals have passed
+          const intervalsPassed = Math.floor(maintenanceMileage / task.intervalMiles);
+          nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+        } else {
+          // For current-based intervals, just add to current
+          nextDueOdometer = maintenanceMileage + task.intervalMiles;
+        }
       }
       
       if (task.intervalDays) {
@@ -87,18 +95,18 @@ export async function POST(
       // Maintain original schedule approach
       if (task.nextDueOdometer && task.intervalMiles) {
         // If maintenance is done early, keep the original due odometer
-        // If maintenance is done late, add the interval to the current odometer
-        nextDueOdometer = (maintenanceMileage < task.nextDueOdometer) 
-          ? task.nextDueOdometer 
-          : maintenanceMileage + task.intervalMiles;
-      }
-      
-      if (task.nextDueDate && task.intervalDays) {
-        // If maintenance is done early, keep the original due date
-        // If maintenance is done late, add the interval to the current date
-        nextDueDate = (maintenanceDate < task.nextDueDate)
-          ? task.nextDueDate
-          : new Date(maintenanceDate.setDate(maintenanceDate.getDate() + task.intervalDays));
+        // If maintenance is done late, calculate the next interval
+        if (maintenanceMileage < task.nextDueOdometer) {
+          nextDueOdometer = task.nextDueOdometer;
+        } else {
+          // For late maintenance, recalculate based on interval base
+          if (task.intervalBase === 'zero') {
+            const intervalsPassed = Math.floor(maintenanceMileage / task.intervalMiles);
+            nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+          } else {
+            nextDueOdometer = maintenanceMileage + task.intervalMiles;
+          }
+        }
       }
     }
     

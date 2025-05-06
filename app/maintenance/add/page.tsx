@@ -29,6 +29,7 @@ export default function AddMaintenancePage() {
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState<Motorcycle | null>(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [intervalBase, setIntervalBase] = useState<'current' | 'zero'>('current');
   
   // Track the type of mileage entry
   const [mileageType, setMileageType] = useState<'interval' | 'absolute'>('interval');
@@ -181,8 +182,9 @@ export default function AddMaintenancePage() {
           name: formData.name,
           description: formData.description || null,
           intervalMiles: intervalMiles,  // Pass the calculated interval
-          nextDueMileage: absoluteMileage, // Pass the absolute value if entered
           intervalDays: formData.intervalDays ? parseInt(formData.intervalDays) : null,
+          intervalBase: intervalBase, // Add the new field
+          nextDueMileage: absoluteMileage, // Pass the absolute value if entered
           priority: formData.priority,
           isRecurring: formData.isRecurring,
         }),
@@ -392,11 +394,59 @@ export default function AddMaintenancePage() {
                             {unitLabel}
                           </span>
                         </div>
-                        {selectedMotorcycle && selectedMotorcycle.currentMileage !== null && formData.intervalMiles && (
-                          <p className="mt-1 text-xs text-gray-600">
-                            Next due at approximately: {calculateNextDueMileage()}
+                        
+                        {/* Add the interval base selector */}
+                        <div className="mt-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Interval Calculation Base
+                          </label>
+                          <div className="flex gap-4">
+                            <div className="flex items-center">
+                              <input
+                                id="current-based"
+                                type="radio"
+                                name="intervalBase"
+                                checked={intervalBase === 'current'}
+                                onChange={() => setIntervalBase('current')}
+                                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <label htmlFor="current-based" className="ml-2 block text-sm text-gray-700">
+                                From Current Mileage
+                              </label>
+                            </div>
+                            <div className="flex items-center">
+                              <input
+                                id="zero-based"
+                                type="radio"
+                                name="intervalBase"
+                                checked={intervalBase === 'zero'}
+                                onChange={() => setIntervalBase('zero')}
+                                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <label htmlFor="zero-based" className="ml-2 block text-sm text-gray-700">
+                                From Zero (Absolute Intervals)
+                              </label>
+                            </div>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Choose whether intervals count from the current mileage or are aligned to fixed values from zero.
                           </p>
-                        )}
+                          
+                          {/* Example calculation based on the selected interval base */}
+                          {formData.intervalMiles && selectedMotorcycle?.currentMileage && (
+                            <div className="mt-2 bg-blue-50 p-2 rounded text-xs text-blue-600">
+                              {intervalBase === 'current' ? (
+                                <span>
+                                  Next service due at: {formatDistance(parseInt(formData.intervalMiles) + selectedMotorcycle.currentMileage)}
+                                </span>
+                              ) : (
+                                <span>
+                                  Next service due at: {formatDistance(Math.ceil(selectedMotorcycle.currentMileage / parseInt(formData.intervalMiles)) * parseInt(formData.intervalMiles))}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div>

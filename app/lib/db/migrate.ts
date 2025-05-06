@@ -95,6 +95,11 @@ async function ensureColumns() {
       console.log("Added 'nextDueDate' column to maintenance_records table");
     }
 
+    if (!taskColumnNames.includes("interval_base")) {
+        db.$client.prepare("ALTER TABLE maintenance_tasks ADD COLUMN interval_base TEXT DEFAULT 'current'").run();
+        console.log("Added 'intervalBase' column to maintenance_tasks table");
+      }
+
     console.log("Required columns ensured successfully");
   } catch (error) {
     console.error("Error ensuring columns:", error);

@@ -157,6 +157,7 @@ export async function PATCH(
       );
     }
     
+    const intervalBase = body.intervalBase === 'zero' ? 'zero' : 'current';
     const currentOdometer = currentMotorcycle.currentMileage || 0;
     
     // Determine next due mileage
@@ -182,8 +183,17 @@ export async function PATCH(
     } 
     // Otherwise calculate from interval
     else if (body.intervalMiles) {
-      nextDueOdometer = currentOdometer + body.intervalMiles;
+      // Calculate differently based on interval base
+      if (intervalBase === 'zero') {
+        // For zero-based intervals
+        const intervalsPassed = Math.floor(currentOdometer / body.intervalMiles);
+        nextDueOdometer = (intervalsPassed + 1) * body.intervalMiles;
+      } else {
+        // For current-based intervals
+        nextDueOdometer = currentOdometer + body.intervalMiles;
+      }
     }
+
     
     // Calculate next due date
     let nextDueDate = task.nextDueDate;
@@ -207,6 +217,7 @@ export async function PATCH(
         description: body.description !== undefined ? body.description : task.description,
         intervalMiles: intervalMiles,
         intervalDays: body.intervalDays !== undefined ? body.intervalDays : task.intervalDays,
+        intervalBase: intervalBase, // Add the new field
         priority: body.priority || task.priority,
         isRecurring: body.isRecurring !== undefined ? body.isRecurring : task.isRecurring,
         
@@ -218,9 +229,10 @@ export async function PATCH(
       })
       .where(eq(maintenanceTasks.id, id))
       .returning();
-
+      
     return NextResponse.json(updatedTask[0]);
   } catch (error) {
+
     console.error("Error updating maintenance task:", error);
     return NextResponse.json(
       { error: "Failed to update maintenance task" },

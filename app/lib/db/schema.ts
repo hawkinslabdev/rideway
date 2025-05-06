@@ -39,6 +39,7 @@ export const maintenanceTasks = sqliteTable("maintenance_tasks", {
   description: text("description"),
   intervalMiles: integer("interval_miles"),
   intervalDays: integer("interval_days"),
+  intervalBase: text("interval_base").default("current").notNull(), // "current" or "zero"
   baseOdometer: integer("base_odometer"),
   nextDueOdometer: integer("next_due_odometer"),
   baseDate: integer("base_date", { mode: "timestamp" }),

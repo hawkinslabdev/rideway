@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     }
     
     // Calculate the next due values based on current motorcycle data
+    const intervalBase = body.intervalBase === 'zero' ? 'zero' : 'current';
     const currentDate = new Date();
     const currentOdometer = motorcycle.currentMileage || 0;
     
@@ -72,7 +73,16 @@ export async function POST(request: Request) {
     } 
     // Otherwise calculate from interval
     else if (body.intervalMiles) {
-      nextDueOdometer = currentOdometer + body.intervalMiles;
+      // Calculate differently based on interval base
+      if (intervalBase === 'zero') {
+        // For zero-based intervals, we calculate how many full intervals 
+        // have passed and add one more full interval
+        const intervalsPassed = Math.floor(currentOdometer / body.intervalMiles);
+        nextDueOdometer = (intervalsPassed + 1) * body.intervalMiles;
+      } else {
+        // For current-based intervals, just add the interval to current mileage
+        nextDueOdometer = currentOdometer + body.intervalMiles;
+      }
     }
     
     // Calculate next due date
@@ -90,9 +100,10 @@ export async function POST(request: Request) {
       description: body.description || null,
       intervalMiles: body.intervalMiles || null,
       intervalDays: body.intervalDays || null,
+      intervalBase: intervalBase, // Add the new field
       
       // New fields for our hybrid approach
-      baseOdometer: currentOdometer,  // Starting point for interval
+      baseOdometer: currentOdometer,
       nextDueOdometer: nextDueOdometer,
       baseDate: currentDate,
       nextDueDate: nextDueDate,
