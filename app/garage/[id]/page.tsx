@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
+  Archive,
   ArrowLeft, 
   Calendar, 
   Wrench, 
@@ -31,6 +32,8 @@ interface Motorcycle {
   purchaseDate: Date | null;
   currentMileage: number | null;
   imageUrl: string | null;
+  isOwned: boolean | null;
+  isDefault: boolean | null;
   notes: string | null;
 }
 
@@ -77,6 +80,7 @@ export default function MotorcycleDetail() {
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [maintenanceSchedule, setMaintenanceSchedule] = useState<MaintenanceTask[]>([]);
   const [recentMaintenance, setRecentMaintenance] = useState<MaintenanceRecord[]>([]);
+  const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [newMileage, setNewMileage] = useState<string>("");
   
@@ -153,6 +157,38 @@ export default function MotorcycleDetail() {
 
     fetchMotorcycleDetails();
   }, [params.id]);
+
+  const handleToggleOwnership = async () => {
+    if (!motorcycle) return;
+    
+    try {
+      const response = await fetch("/api/motorcycles/ownership", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          motorcycleId: motorcycle.id, 
+          isOwned: !motorcycle.isOwned 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update ownership status");
+      }
+      
+      // Refresh the motorcycle data
+      const refreshResponse = await fetch(`/api/motorcycles/${motorcycle.id}`);
+      if (refreshResponse.ok) {
+        const refreshedData = await refreshResponse.json();
+        setMotorcycle(refreshedData.motorcycle);
+      }
+      
+      setShowOwnershipModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update ownership status");
+    }
+  };
 
   const handleMileageUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,6 +318,17 @@ export default function MotorcycleDetail() {
                   >
                     <Gauge size={16} className="mr-1" />
                     Update Mileage
+                  </button>
+                  <button 
+                    onClick={() => setShowOwnershipModal(true)}
+                    className={`px-3 py-1.5 ${
+                      motorcycle.isOwned 
+                        ? "bg-gray-100 text-gray-700" 
+                        : "bg-blue-100 text-blue-700"
+                    } rounded-md flex items-center hover:bg-gray-200 text-sm ml-2`}
+                  >
+                    <Archive size={16} className="mr-1" />
+                    {motorcycle.isOwned ? "Archive" : "Restore"}
                   </button>
                   <Link
                     href={`/garage/${motorcycle.id}/edit`}
@@ -646,6 +693,49 @@ export default function MotorcycleDetail() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Ownership Modal */}
+        {showOwnershipModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium mb-2">
+                {motorcycle.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {motorcycle.isOwned
+                  ? "Archiving will mark this motorcycle as no longer owned. It will still appear in your service history but will be hidden from the main garage view."
+                  : "Restoring will mark this motorcycle as currently owned and make it visible in your garage again."}
+              </p>
+              
+              {motorcycle.isOwned && motorcycle.isDefault && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  <strong>Note:</strong> This motorcycle is currently set as your default. Archiving it will remove this status.
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOwnershipModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleOwnership}
+                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                    motorcycle.isOwned
+                      ? "bg-amber-600 hover:bg-amber-700"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {motorcycle.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
+                </button>
+              </div>
             </div>
           </div>
         )}

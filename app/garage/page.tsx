@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ClientLayout from "../components/ClientLayout";
-import { Plus, MoreVertical, Search, Bike, Edit, Trash2 } from "lucide-react";
+import { Plus, MoreVertical, Search, Bike, Edit, Trash2, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -17,6 +17,8 @@ interface Motorcycle {
   year: number;
   currentMileage: number | null;
   imageUrl: string | null;
+  isOwned: boolean;
+  isDefault: boolean;
 }
 
 const DropdownMenu = ({ children, isOpen, onClose, triggerRef }: {
@@ -69,6 +71,7 @@ export default function Garage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMake, setSelectedMake] = useState("");
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const dropdownTriggerRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
   useEffect(() => {
@@ -90,12 +93,14 @@ export default function Garage() {
     }
   };
 
-  // Filter motorcycles based on search and make
+  // Filter motorcycles based on search, make, and ownership status
   const filteredMotorcycles = motorcycles.filter(motorcycle => {
     const matchesSearch = motorcycle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          motorcycle.model.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesMake = !selectedMake || motorcycle.make.toLowerCase() === selectedMake.toLowerCase();
-    return matchesSearch && matchesMake;
+    const matchesOwnership = showArchived ? true : motorcycle.isOwned !== false;
+    
+    return matchesSearch && matchesMake && matchesOwnership;
   });
 
   // Get unique makes for the filter dropdown
@@ -121,6 +126,36 @@ export default function Garage() {
     } catch (err) {
       console.error('Error deleting motorcycle:', err);
       setError('Failed to delete motorcycle');
+    }
+  };
+
+  const handleSetDefaultMotorcycle = async (motorcycleId: string) => {
+    try {
+      const response = await fetch("/api/motorcycles/default", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ motorcycleId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to set default motorcycle");
+      }
+
+      // Update local state to reflect the new default
+      setMotorcycles(prev => 
+        prev.map(moto => ({
+          ...moto,
+          isDefault: moto.id === motorcycleId
+        }))
+      );
+      
+      // Close the dropdown
+      setOpenDropdownId(null);
+    } catch (err) {
+      console.error("Error setting default motorcycle:", err);
+      setError("Failed to set default motorcycle");
     }
   };
 
@@ -163,8 +198,8 @@ export default function Garage() {
         </div>
 
         {/* Search and filter */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6 flex items-center">
-          <div className="relative flex-grow">
+        <div className="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap gap-4 items-center">
+          <div className="relative flex-grow min-w-[200px]">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={16} className="text-gray-400" />
             </div>
@@ -176,16 +211,26 @@ export default function Garage() {
               className="pl-10 pr-4 py-2 border rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          
           <select 
             value={selectedMake}
             onChange={(e) => setSelectedMake(e.target.value)}
-            className="ml-4 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Makes</option>
             {uniqueMakes.map(make => (
               <option key={make} value={make.toLowerCase()}>{make}</option>
             ))}
           </select>
+          
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`inline-flex items-center px-3 py-2 border ${
+              showArchived ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-gray-300 text-gray-700'
+            } rounded-md text-sm font-medium hover:bg-gray-50`}
+          >
+            {showArchived ? "Hide Archived" : "Show Archived"}
+          </button>
         </div>
 
         {/* Motorcycle List */}
@@ -204,13 +249,16 @@ export default function Garage() {
                     Mileage
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMotorcycles.map((motorcycle, index) => (
-                  <tr key={motorcycle.id} className="hover:bg-gray-50">
+                {filteredMotorcycles.map((motorcycle) => (
+                  <tr key={motorcycle.id} className={`hover:bg-gray-50 ${!motorcycle.isOwned ? 'bg-gray-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
@@ -225,7 +273,15 @@ export default function Garage() {
                           )}
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{motorcycle.name}</div>
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-gray-900">{motorcycle.name}</span>
+                            {motorcycle.isDefault && (
+                              <Star size={16} className="ml-1 text-yellow-500 fill-yellow-500" />
+                            )}
+                          </div>
+                          {!motorcycle.isOwned && (
+                            <span className="text-xs text-gray-500">Archived</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -235,9 +291,25 @@ export default function Garage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {/* Use formatDistance instead of hardcoded units */}
                         {motorcycle.currentMileage ? formatDistance(motorcycle.currentMileage) : "Not set"}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span 
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          motorcycle.isDefault
+                            ? "bg-blue-100 text-blue-800"
+                            : motorcycle.isOwned
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {motorcycle.isDefault 
+                          ? "Default" 
+                          : motorcycle.isOwned 
+                            ? "Active" 
+                            : "Archived"}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center">
@@ -245,8 +317,9 @@ export default function Garage() {
                           onClick={() => router.push(`/garage/${motorcycle.id}`)}
                           className="text-blue-600 hover:text-blue-900 mr-4"
                         >
-                          Details
+                          View
                         </button>
+                        
                         <button
                           ref={(el) => { dropdownTriggerRefs.current[motorcycle.id] = el; }}
                           onClick={() => setOpenDropdownId(openDropdownId === motorcycle.id ? null : motorcycle.id)}
@@ -271,6 +344,19 @@ export default function Garage() {
                               <Edit size={16} className="mr-3" />
                               Edit
                             </button>
+                            
+                            {/* Set as Default option - only shown for non-default owned motorcycles */}
+                            {motorcycle.isOwned && !motorcycle.isDefault && (
+                              <button
+                                onClick={() => handleSetDefaultMotorcycle(motorcycle.id)}
+                                className="w-full flex items-center px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
+                                role="menuitem"
+                              >
+                                <Star size={16} className="mr-3" />
+                                Set as Default
+                              </button>
+                            )}
+                            
                             <button
                               onClick={() => handleDeleteMotorcycle(motorcycle.id)}
                               className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -287,13 +373,15 @@ export default function Garage() {
                 ))}
                 {filteredMotorcycles.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center">
+                    <td colSpan={5} className="px-6 py-4 text-center">
                       <div className="py-8">
                         <Bike size={48} className="mx-auto text-gray-400 mb-4" />
                         <p className="text-gray-500">
                           {motorcycles.length === 0 
                             ? "No motorcycles in your garage yet" 
-                            : "No motorcycles match your search criteria"}
+                            : showArchived
+                              ? "No motorcycles match your search criteria"
+                              : "No active motorcycles match your search criteria"}
                         </p>
                         {motorcycles.length === 0 && (
                           <Link

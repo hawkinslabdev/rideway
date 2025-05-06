@@ -1,7 +1,7 @@
 // app/garage/add/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientLayout from "../../components/ClientLayout";
 import Link from "next/link";
@@ -14,6 +14,10 @@ export default function AddMotorcycle() {
   const searchParams = useSearchParams();
   const isInitialSetup = searchParams.get('initial') === 'true';
   const { settings, getUnitsLabel } = useSettings();
+  
+  // Add state for image file
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -45,6 +49,21 @@ export default function AddMotorcycle() {
     }));
   };
 
+  // Add image handling function
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -55,15 +74,27 @@ export default function AddMotorcycle() {
       const displayMileage = DistanceUtil.parseInput(formData.currentMileage);
       const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
 
+      // Create FormData to handle file upload
+      const submitData = new FormData();
+      
+      // Add all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        submitData.append(key, value.toString());
+      });
+      
+      // Add the converted mileage
+      if (storageMileage !== null) {
+        submitData.append("currentMileage", storageMileage.toString());
+      }
+      
+      // Add image file if present
+      if (imageFile) {
+        submitData.append('image', imageFile);
+      }
+
       const response = await fetch("/api/motorcycles", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...formData,
-          currentMileage: storageMileage, // Always store in kilometers
-        }),
+        body: submitData,
       });
 
       if (!response.ok) {
@@ -124,11 +155,22 @@ export default function AddMotorcycle() {
                 </label>
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                   <div className="space-y-1 text-center">
-                    <Camera className="mx-auto h-12 w-12 text-gray-400" />
+                    {imagePreview ? (
+                      <div className="mb-4">
+                        <img src={imagePreview} alt="Preview" className="mx-auto h-32 w-auto rounded-md object-cover" />
+                      </div>
+                    ) : (
+                      <Camera className="mx-auto h-12 w-12 text-gray-400" />
+                    )}
                     <div className="flex text-sm text-gray-600">
                       <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                        <span>Upload a photo</span>
-                        <input type="file" className="sr-only" accept="image/*" />
+                        <span>{imagePreview ? 'Change photo' : 'Upload a photo'}</span>
+                        <input 
+                          type="file" 
+                          className="sr-only" 
+                          accept="image/*"
+                          onChange={handleImageChange}
+                        />
                       </label>
                       <p className="pl-1">or drag and drop</p>
                     </div>
