@@ -73,7 +73,7 @@ export async function POST(
     // Calculate next due values based on the approach selected
     let nextDueOdometer = null;
     let nextDueDate = null;
-    
+
     if (resetSchedule) {
       // Reset approach: calculate from current values based on intervalBase
       if (task.intervalMiles) {
@@ -106,6 +106,19 @@ export async function POST(
           } else {
             nextDueOdometer = maintenanceMileage + task.intervalMiles;
           }
+        }
+      }
+      
+      // For date intervals, similar logic can be applied
+      if (task.nextDueDate && task.intervalDays) {
+        const now = new Date();
+        if (now < task.nextDueDate) {
+          // If early, keep original date
+          nextDueDate = task.nextDueDate;
+        } else {
+          // If late, add interval to current date
+          nextDueDate = new Date();
+          nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
         }
       }
     }

@@ -94,6 +94,7 @@ export default function MotorcycleDetail() {
       if (!params.id) return;
       
       try {
+        setLoading(true);
         const response = await fetch(`/api/motorcycles/${params.id}`);
         if (!response.ok) {
           if (response.status === 404) {
@@ -113,11 +114,11 @@ export default function MotorcycleDetail() {
         }
         
         // Generate activity logs from maintenance records
-        const logs: ActivityLog[] = [];
-        
-        // Add maintenance records as activity
         if (data.recentMaintenance) {
-          data.recentMaintenance.forEach((record: MaintenanceRecord) => {
+          const logs = [];
+          
+          // Add maintenance records as activity
+          data.recentMaintenance.forEach((record) => {
             logs.push({
               id: record.id,
               type: 'maintenance',
@@ -131,25 +132,25 @@ export default function MotorcycleDetail() {
               }
             });
           });
+          
+          // Add motorcycle creation date as an activity
+          if (data.motorcycle.createdAt) {
+            logs.push({
+              id: 'creation',
+              type: 'mileageUpdate',
+              date: new Date(data.motorcycle.createdAt),
+              description: "Motorcycle added to garage",
+              details: {
+                mileage: data.motorcycle.currentMileage
+              }
+            });
+          }
+          
+          // Sort by date, most recent first
+          logs.sort((a, b) => b.date.getTime() - a.date.getTime());
+          
+          setActivityLogs(logs);
         }
-        
-        // Add motorcycle creation date as an activity
-        if (data.motorcycle.createdAt) {
-          logs.push({
-            id: 'creation',
-            type: 'mileageUpdate',
-            date: new Date(data.motorcycle.createdAt),
-            description: "Motorcycle added to garage",
-            details: {
-              mileage: data.motorcycle.currentMileage
-            }
-          });
-        }
-        
-        // Sort by date, most recent first
-        logs.sort((a, b) => b.date.getTime() - a.date.getTime());
-        
-        setActivityLogs(logs);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -159,7 +160,7 @@ export default function MotorcycleDetail() {
 
     fetchMotorcycleDetails();
   }, [params.id]);
-
+  
   const handleToggleOwnership = async () => {
     if (!motorcycle) return;
     
@@ -197,6 +198,9 @@ export default function MotorcycleDetail() {
     if (!motorcycle) return;
     
     try {
+      // Store previous mileage for logging
+      const previousMileage = motorcycle.currentMileage;
+      
       const response = await fetch(`/api/motorcycles/${motorcycle.id}`, {
         method: "PATCH",
         headers: {
@@ -211,15 +215,29 @@ export default function MotorcycleDetail() {
         throw new Error("Failed to update mileage");
       }
       
-      // Add the mileage update to activity logs
+      await fetch("/api/motorcycles/mileage-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          motorcycleId: motorcycle.id,
+          previousMileage: motorcycle.currentMileage,
+          newMileage: parseInt(newMileage),
+          notes: `Updated mileage from ${formatDistance(motorcycle.currentMileage || 0)} to ${formatDistance(parseInt(newMileage))}`
+        }),
+      });
+
+      // Add the mileage update to activity logs with improved detail
       const newLog: ActivityLog = {
         id: `mileage-${Date.now()}`,
         type: 'mileageUpdate',
         date: new Date(),
-        description: `Updated mileage to ${formatDistance(parseInt(newMileage))}`,
+        description: `Updated mileage from ${formatDistance(previousMileage || 0)} to ${formatDistance(parseInt(newMileage))}`,
         details: {
-          previousMileage: motorcycle.currentMileage,
-          newMileage: parseInt(newMileage)
+          previousMileage: previousMileage,
+          newMileage: parseInt(newMileage),
+          difference: previousMileage !== null ? parseInt(newMileage) - previousMileage : null
         }
       };
       

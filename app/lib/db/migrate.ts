@@ -1,9 +1,14 @@
 // app/lib/db/migrate.ts
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { db } from "./db";
-import { users, motorcycles, maintenanceTasks, maintenanceRecords } from "./schema";
-import { eq, or, isNull, and } from "drizzle-orm";
 import Database from "better-sqlite3";
+import { randomUUID } from "crypto";
+
+// Import the database configuration first
+import { db } from "./db";
+
+// Then import the schema
+import { users, motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "./schema";
+import { eq, or, isNull, and, not } from "drizzle-orm";
 
 // This will run migrations on the database, creating tables if they don't exist
 // and adding data
@@ -11,6 +16,13 @@ console.log("Running migrations...");
 
 // Run the schema migrations first
 migrate(db, { migrationsFolder: "./drizzle" });
+
+// Add this helper function at the top of the file
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
 
 // Ensure the required columns exist in the tables
 async function ensureColumns() {
@@ -96,9 +108,35 @@ async function ensureColumns() {
     }
 
     if (!taskColumnNames.includes("interval_base")) {
-        db.$client.prepare("ALTER TABLE maintenance_tasks ADD COLUMN interval_base TEXT DEFAULT 'current'").run();
-        console.log("Added 'intervalBase' column to maintenance_tasks table");
-      }
+      db.$client.prepare("ALTER TABLE maintenance_tasks ADD COLUMN interval_base TEXT DEFAULT 'current'").run();
+      console.log("Added 'intervalBase' column to maintenance_tasks table");
+    }
+
+    // Check if mileage_logs table exists
+    let mileageLogsTableExists = false;
+    try {
+      db.$client.prepare("SELECT * FROM mileage_logs LIMIT 1").all();
+      mileageLogsTableExists = true;
+      console.log("mileage_logs table exists");
+    } catch (error) {
+      // Table doesn't exist, this is expected
+    }
+
+    // If table doesn't exist, create it
+    if (!mileageLogsTableExists) {
+      db.$client.prepare(`
+        CREATE TABLE mileage_logs (
+          id TEXT PRIMARY KEY,
+          motorcycle_id TEXT NOT NULL REFERENCES motorcycles(id) ON DELETE CASCADE,
+          previous_mileage INTEGER,
+          new_mileage INTEGER NOT NULL,
+          date INTEGER NOT NULL,
+          notes TEXT,
+          created_at INTEGER NOT NULL
+        )
+      `).run();
+      console.log("Created mileage_logs table");
+    }
 
     console.log("Required columns ensured successfully");
   } catch (error) {
@@ -186,21 +224,10 @@ async function updateMaintenanceTasks() {
     const allTasks = await db.query.maintenanceTasks.findMany();
     console.log(`Found ${allTasks.length} maintenance tasks`);
 
-    // Get all maintenance records
-    const allRecords = await db.query.maintenanceRecords.findMany();
-    console.log(`Found ${allRecords.length} maintenance records`);
-
     // Process each task to add new fields
     let updatedCount = 0;
     for (const task of allTasks) {
       console.log(`Processing task: ${task.id} - ${task.name}`);
-
-      // Skip tasks that already have values
-      if (task.baseOdometer !== null && task.baseDate !== null && 
-          task.nextDueOdometer !== null && task.nextDueDate !== null) {
-        console.log(`  - Task ${task.id} already has tracking fields, skipping`);
-        continue;
-      }
 
       // Find the associated motorcycle
       const motorcycle = allMotorcycles.find(m => m.id === task.motorcycleId);
@@ -209,70 +236,85 @@ async function updateMaintenanceTasks() {
         continue;
       }
 
-      // Find the most recent maintenance record for this task
-      const taskRecords = allRecords
-        .filter(r => r.taskId === task.id)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      const lastRecord = taskRecords.length > 0 ? taskRecords[0] : null;
-      
-      // Set base values for calculations
-      const currentDate = new Date();
-      const baseDate = lastRecord ? new Date(lastRecord.date) : currentDate;
-      const baseOdometer = lastRecord ? lastRecord.mileage : motorcycle.currentMileage || 0;
+      // Set interval base if not set
+      const intervalBase = task.intervalBase || 'current';
       
       // Calculate next due values
       let nextDueOdometer = null;
-      if (task.intervalMiles && baseOdometer !== null) {
-        nextDueOdometer = baseOdometer + task.intervalMiles;
-      }
-      
-      let nextDueDate = null;
-      if (task.intervalDays) {
-        nextDueDate = new Date(baseDate);
-        nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+      if (task.intervalMiles && motorcycle.currentMileage !== null) {
+        if (intervalBase === 'current') {
+          // Current-based: Add interval to current mileage
+          nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
+        } else {
+          // Zero-based: find next interval from zero
+          const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+          nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+        }
       }
       
       // Update the task with new fields
-      console.log(`  - Updating task with calculated values:
-        baseOdometer: ${baseOdometer}
-        baseDate: ${baseDate.toISOString()}
-        nextDueOdometer: ${nextDueOdometer}
-        nextDueDate: ${nextDueDate?.toISOString() || 'null'}`);
-      
       await db.update(maintenanceTasks)
         .set({
-          baseOdometer: baseOdometer,
-          baseDate: baseDate,
+          baseOdometer: motorcycle.currentMileage || 0,
+          baseDate: new Date(),
           nextDueOdometer: nextDueOdometer,
-          nextDueDate: nextDueDate,
+          nextDueDate: task.intervalDays ? addDays(new Date(), task.intervalDays) : null,
+          intervalBase: intervalBase,
           archived: task.archived || false
         })
         .where(eq(maintenanceTasks.id, task.id));
       
       updatedCount++;
-      console.log(`  - Task updated successfully`);
-      
-      // Update the last record with next due values if it exists
-      if (lastRecord) {
-        console.log(`  - Updating last record with next due values`);
-        
-        await db.update(maintenanceRecords)
-          .set({
-            isScheduled: true,
-            resetsInterval: true,
-            nextDueOdometer: nextDueOdometer,
-            nextDueDate: nextDueDate,
-          })
-          .where(eq(maintenanceRecords.id, lastRecord.id));
-        
-        console.log(`  - Record updated successfully`);
-      }
+      console.log(`  - Task updated successfully with interval base: ${intervalBase}`);
     }
 
     console.log(`Updated ${updatedCount} maintenance tasks with tracking fields`);
   } catch (error) {
     console.error("Error updating maintenance tasks:", error);
+    throw error;
+  }
+}
+
+// Backfill mileage logs for existing motorcycles with mileage
+async function backfillMileageLogs() {
+  console.log("Backfilling mileage logs for motorcycles with existing mileage...");
+  
+  try {
+    // Get all motorcycles with mileage data
+    const motorcyclesWithMileage = await db.query.motorcycles.findMany({
+      where: (motorcycles, { not, isNull }) => not(isNull(motorcycles.currentMileage))
+    });
+    
+    console.log(`Found ${motorcyclesWithMileage.length} motorcycles with mileage data`);
+    
+    let createdLogsCount = 0;
+    
+    for (const motorcycle of motorcyclesWithMileage) {
+      // Check if this motorcycle already has any mileage logs
+      const existingLogs = await db.query.mileageLogs.findMany({
+        where: eq(mileageLogs.motorcycleId, motorcycle.id)
+      });
+      
+      if (existingLogs.length === 0 && motorcycle.currentMileage) {
+        // Create an initial log for the current mileage
+        await db.insert(mileageLogs).values({
+          id: randomUUID(),
+          motorcycleId: motorcycle.id,
+          previousMileage: null, // No previous mileage for initial entry
+          newMileage: motorcycle.currentMileage,
+          date: motorcycle.updatedAt || new Date(),
+          notes: "Initial mileage record",
+          createdAt: new Date()
+        });
+        
+        createdLogsCount++;
+        console.log(`Created initial mileage log for motorcycle ${motorcycle.id}`);
+      }
+    }
+    
+    console.log(`Created ${createdLogsCount} initial mileage logs`);
+  } catch (error) {
+    console.error("Error backfilling mileage logs:", error);
     throw error;
   }
 }
@@ -283,6 +325,7 @@ async function runMigrations() {
     console.log("Starting migration process...");
     await ensureColumns();
     await setupExistingData();
+    await backfillMileageLogs();
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);

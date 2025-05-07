@@ -67,6 +67,16 @@ export const maintenanceRecords = sqliteTable("maintenance_records", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
 
+export const mileageLogs = sqliteTable("mileage_logs", {
+  id: text("id").primaryKey(),
+  motorcycleId: text("motorcycle_id").notNull().references(() => motorcycles.id, { onDelete: "cascade" }),
+  previousMileage: integer("previous_mileage"),
+  newMileage: integer("new_mileage").notNull(),
+  date: integer("date", { mode: "timestamp" }).notNull(),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
 // Define relationships
 export const motorcyclesRelations = relations(motorcycles, ({ one, many }) => ({
   user: one(users, {
@@ -85,7 +95,6 @@ export const maintenanceTasksRelations = relations(maintenanceTasks, ({ one, man
   records: many(maintenanceRecords),
 }));
 
-
 export const maintenanceRecordsRelations = relations(maintenanceRecords, ({ one }) => ({
   motorcycle: one(motorcycles, {
     fields: [maintenanceRecords.motorcycleId],
@@ -94,5 +103,12 @@ export const maintenanceRecordsRelations = relations(maintenanceRecords, ({ one 
   task: one(maintenanceTasks, {
     fields: [maintenanceRecords.taskId],
     references: [maintenanceTasks.id],
+  }),
+}));
+
+export const mileageLogsRelations = relations(mileageLogs, ({ one }) => ({
+  motorcycle: one(motorcycles, {
+    fields: [mileageLogs.motorcycleId],
+    references: [motorcycles.id],
   }),
 }));

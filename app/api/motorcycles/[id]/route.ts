@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { db } from "@/app/lib/db/db";
-import { motorcycles, maintenanceTasks, maintenanceRecords } from "@/app/lib/db/schema";
+import { motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "@/app/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
+import { randomUUID } from "crypto";
 
 export async function GET(
   request: Request,
@@ -68,27 +69,61 @@ export async function GET(
             dueDate = new Date(lastRecord.date);
             dueDate.setDate(dueDate.getDate() + task.intervalDays);
           }
-          if (task.intervalMiles && lastRecord.mileage) {
+          
+          // Use next due mileage from record if available, otherwise calculate
+          if (lastRecord.nextDueOdometer) {
+            dueMileage = lastRecord.nextDueOdometer;
+          } else if (task.intervalMiles && lastRecord.mileage) {
             dueMileage = lastRecord.mileage + task.intervalMiles;
           }
         } else {
-          // If no previous record, calculate from current date/mileage
+          // First time maintenance - calculate from current values
           if (task.intervalDays) {
-            dueDate = new Date();
+            // For first maintenance with day interval, use motorcycle purchase date if available, otherwise use today
+            const startDate = motorcycle.purchaseDate || new Date();
+            dueDate = new Date(startDate);
             dueDate.setDate(dueDate.getDate() + task.intervalDays);
           }
-          if (task.intervalMiles && motorcycle.currentMileage) {
-            dueMileage = motorcycle.currentMileage + task.intervalMiles;
+          
+          // Use task's nextDueOdometer if available, otherwise calculate
+          if (task.nextDueOdometer) {
+            dueMileage = task.nextDueOdometer;
+          } else if (task.intervalMiles && motorcycle.currentMileage) {
+            if (task.intervalBase === 'zero') {
+              // For zero-based intervals, find the next milestone
+              const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+              dueMileage = (intervalsPassed + 1) * task.intervalMiles;
+            } else {
+              // For current-based intervals, add to current
+              dueMileage = motorcycle.currentMileage + task.intervalMiles;
+            }
           }
         }
 
-        // Determine if the task is overdue
+        // Determine if the task is due based on either date or mileage
         const now = new Date();
-        const isOverdue = (dueDate && dueDate < now) || 
-                         (dueMileage && motorcycle.currentMileage && dueMileage <= motorcycle.currentMileage);
+        const isDueByDate = dueDate && dueDate <= now;
+        const isDueByMileage = dueMileage && motorcycle.currentMileage && dueMileage <= motorcycle.currentMileage;
+        const isDue = isDueByDate || isDueByMileage;
 
-        if (isOverdue) {
+        // If task is due, set priority to high
+        if (isDue) {
           priority = "high";
+        }
+
+        // Calculate remaining miles
+        let remainingMiles = null;
+        if (dueMileage && motorcycle.currentMileage) {
+          remainingMiles = dueMileage - motorcycle.currentMileage;
+          if (remainingMiles < 0) remainingMiles = 0;
+        }
+
+        // Calculate completion percentage
+        let completionPercentage = null;
+        if (task.intervalMiles && remainingMiles !== null) {
+          completionPercentage = ((task.intervalMiles - Math.max(0, remainingMiles)) / task.intervalMiles) * 100;
+          // Cap at 100%
+          completionPercentage = Math.min(100, Math.max(0, completionPercentage));
         }
 
         return {
@@ -97,11 +132,15 @@ export async function GET(
           description: task.description,
           intervalMiles: task.intervalMiles,
           intervalDays: task.intervalDays,
+          intervalBase: task.intervalBase,
           lastCompleted: lastRecord ? lastRecord.date : null,
           lastMileage: lastRecord ? lastRecord.mileage : null,
           dueDate,
           dueMileage,
           priority,
+          isDue,
+          remainingMiles,
+          completionPercentage
         };
       })
     );
@@ -218,9 +257,29 @@ export async function PATCH(
         updateData.year = parseInt(year.toString());
       }
 
-      const currentMileage = formData.get('currentMileage');
-      if (currentMileage) {
-        updateData.currentMileage = parseInt(currentMileage.toString());
+      // Handle mileage field - important for maintenance scheduling
+      const formMileage = formData.get('currentMileage');
+      const oldMileage = motorcycle.currentMileage;
+      
+      if (formMileage) {
+        const newMileage = parseInt(formMileage.toString());
+        updateData.currentMileage = newMileage;
+        
+        // Create mileage log entry when mileage changes
+        if (oldMileage !== newMileage) {
+          await db.insert(mileageLogs).values({
+            id: randomUUID(),
+            motorcycleId: id,
+            previousMileage: oldMileage,
+            newMileage: newMileage,
+            date: new Date(),
+            notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
+            createdAt: new Date()
+          });
+          
+          // Update maintenance tasks based on new mileage
+          await updateMaintenanceTasks(id, oldMileage, newMileage);
+        }
       }
 
       // Handle date field
@@ -239,16 +298,39 @@ export async function PATCH(
       
       updateData = {
         ...updateData,
-        name: body.name,
-        make: body.make,
-        model: body.model,
+        name: body.name ?? motorcycle.name,
+        make: body.make ?? motorcycle.make,
+        model: body.model ?? motorcycle.model,
         year: body.year ? parseInt(body.year) : motorcycle.year,
-        vin: body.vin || null,
-        color: body.color || null,
-        purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
-        currentMileage: body.currentMileage ? parseInt(body.currentMileage) : null,
-        notes: body.notes || null,
+        vin: body.vin ?? motorcycle.vin,
+        color: body.color ?? motorcycle.color,
+        purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : motorcycle.purchaseDate,
+        notes: body.notes ?? motorcycle.notes,
       };
+      
+      // Handle mileage update - important for maintenance scheduling
+      const oldMileage = motorcycle.currentMileage;
+      
+      if (body.currentMileage !== undefined) {
+        const newMileage = parseInt(body.currentMileage);
+        updateData.currentMileage = newMileage;
+        
+        // Create mileage log entry when mileage changes
+        if (oldMileage !== newMileage) {
+          await db.insert(mileageLogs).values({
+            id: randomUUID(),
+            motorcycleId: id,
+            previousMileage: oldMileage,
+            newMileage: newMileage,
+            date: new Date(),
+            notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
+            createdAt: new Date()
+          });
+          
+          // Update maintenance tasks based on new mileage
+          await updateMaintenanceTasks(id, oldMileage, newMileage);
+        }
+      }
     }
 
     // Update motorcycle
@@ -310,5 +392,40 @@ export async function DELETE(
       { error: "Failed to delete motorcycle" },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Helper function to properly update maintenance tasks when motorcycle mileage changes
+ */
+async function updateMaintenanceTasks(motorcycleId: string, oldMileage: number | null, newMileage: number) {
+  // Skip if no previous mileage or mileage decreased
+  if (oldMileage === null || newMileage <= oldMileage) {
+    return;
+  }
+
+  // Get all maintenance tasks for this motorcycle
+  const tasks = await db.query.maintenanceTasks.findMany({
+    where: eq(maintenanceTasks.motorcycleId, motorcycleId),
+  });
+
+  // Process each task
+  for (const task of tasks) {
+    if (!task.intervalMiles) continue;
+
+    if (task.intervalBase === 'zero') {
+      // For zero-based intervals: recalculate based on current mileage milestones
+      const intervalsPassed = Math.floor(newMileage / task.intervalMiles);
+      const nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+      
+      await db.update(maintenanceTasks)
+        .set({
+          nextDueOdometer: nextDueOdometer,
+          baseOdometer: newMileage, // Update base odometer to current value
+        })
+        .where(eq(maintenanceTasks.id, task.id));
+    } 
+    // For current-based intervals, we intentionally don't update the next due mileage
+    // This keeps the maintenance schedule consistent and prevents it from being pushed forward
   }
 }

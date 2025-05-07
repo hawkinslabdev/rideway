@@ -20,8 +20,7 @@ try {
   console.log("Database connected successfully");
 } catch (error) {
   console.error("Failed to connect to database:", error);
-  // Create a new database file if it doesn't exist
-  sqlite = new Database(dbPath);
+  throw error; // Throw the error instead of reinitializing
 }
 
 export const db = drizzle(sqlite, { schema });
