@@ -7,15 +7,18 @@ import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import {
   Bike, Home, Wrench, History, BarChart3, Settings,
-  User, LogOut, Menu, X, ChevronDown
+  User, LogOut, Menu, X, ChevronDown, AlertCircle,
+  Plus, Gauge, Tool, Bell, Calendar
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import MileageUpdateModal from "./MileageUpdateModal"; // Create this component separately
 
-const NavItem = ({ href, icon, label, badge = 0 }: {
+const NavItem = ({ href, icon, label, badge = 0, alert = false }: {
   href: string;
   icon: React.ReactNode;
   label: string;
   badge?: number;
+  alert?: boolean;
 }) => {
   const pathname = usePathname();
   const isActive = pathname === href || (href !== "/" && pathname?.startsWith(href));
@@ -31,6 +34,9 @@ const NavItem = ({ href, icon, label, badge = 0 }: {
           {badge}
         </span>
       )}
+      {alert && (
+        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+      )}
     </Link>
   );
 };
@@ -42,7 +48,10 @@ export default function Sidebar() {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const maintenanceAlerts = 2;
+  const [showMileageModal, setShowMileageModal] = useState(false);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState(0);
+  const [overdueMotorcycles, setOverdueMotorcycles] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
@@ -54,6 +63,40 @@ export default function Sidebar() {
     };
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  // Fetch alert data when component mounts
+  useEffect(() => {
+    const fetchAlertData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch maintenance data
+        const response = await fetch("/api/dashboard");
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Set the number of alerts
+          setMaintenanceAlerts(data.overdueCount || 0);
+          
+          // Filter motorcycles with overdue maintenance
+          if (data.motorcycles && data.upcomingMaintenance) {
+            const motorcyclesWithOverdue = data.motorcycles.filter((moto: any) => 
+              data.upcomingMaintenance.some((task: any) => 
+                task.motorcycleId === moto.id && task.isDue
+              )
+            ).slice(0, 3); // Limit to 3 motorcycles
+            
+            setOverdueMotorcycles(motorcyclesWithOverdue);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch alert data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAlertData();
   }, []);
 
   const handleSignOut = async () => {
@@ -69,9 +112,33 @@ export default function Sidebar() {
           <Bike className="mr-2" />
           Rideway
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle Menu" className="p-2 rounded-full bg-blue-800/30 hover:bg-blue-800/50">
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center">
+          {maintenanceAlerts > 0 && (
+            <button 
+              onClick={() => router.push('/maintenance')} 
+              className="mr-3 relative"
+            >
+              <Bell size={20} />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center">
+                {maintenanceAlerts}
+              </span>
+            </button>
+          )}
+          <button 
+            onClick={() => setShowMileageModal(true)} 
+            className="mr-3"
+            aria-label="Update Mileage"
+          >
+            <Gauge size={20} />
+          </button>
+          <button 
+            onClick={() => setMobileOpen(!mobileOpen)} 
+            aria-label="Toggle Menu" 
+            className="p-2 rounded-full bg-blue-800/30 hover:bg-blue-800/50"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </header>
 
       {/* Overlay */}
@@ -105,15 +172,83 @@ export default function Sidebar() {
           </div>
         </div>
 
+        {/* Quick Actions */}
+        <div className="mx-5 mb-4 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setShowMileageModal(true)}
+            className="flex flex-col items-center justify-center bg-blue-800 rounded-lg p-3 hover:bg-blue-700 transition-colors"
+          >
+            <Gauge size={18} className="mb-1 text-blue-300" />
+            <span className="text-xs">Update Mileage</span>
+          </button>
+          <Link
+            href="/maintenance/add"
+            className="flex flex-col items-center justify-center bg-blue-800 rounded-lg p-3 hover:bg-blue-700 transition-colors"
+          >
+            <Wrench size={18} className="mb-1 text-blue-300" />
+            <span className="text-xs">Log Maintenance</span>
+          </Link>
+        </div>
+
         {/* Nav */}
         <div className="px-3">
           <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Main Menu</div>
           <NavItem href="/" icon={<Home size={18} />} label="Dashboard" />
           <NavItem href="/garage" icon={<Bike size={18} />} label="My Garage" />
-          <NavItem href="/maintenance" icon={<Wrench size={18} />} label="Maintenance" badge={maintenanceAlerts} />
+          <NavItem 
+            href="/maintenance" 
+            icon={<Wrench size={18} />} 
+            label="Maintenance" 
+            badge={maintenanceAlerts} 
+          />
           <NavItem href="/history" icon={<History size={18} />} label="Service History" />
           <NavItem href="/statistics" icon={<BarChart3 size={18} />} label="Statistics" />
         </div>
+
+        {/* Maintenance Alerts Section (if there are any) */}
+        {maintenanceAlerts > 0 && !isLoading && (
+          <div className="mx-5 my-4">
+            <div className="px-2 py-1 text-xs font-semibold text-red-400 uppercase flex items-center">
+              <AlertCircle size={14} className="mr-1" />
+              Overdue Maintenance
+            </div>
+            <div className="mt-2 bg-red-900/30 rounded-lg p-2">
+              {overdueMotorcycles.map((motorcycle) => (
+                <Link 
+                  key={motorcycle.id}
+                  href={`/maintenance?motorcycle=${motorcycle.id}`}
+                  className="flex items-center py-2 px-2 hover:bg-red-900/30 rounded-md transition-colors"
+                >
+                  <div className="w-7 h-7 bg-red-800/50 rounded-full flex items-center justify-center mr-2">
+                    {motorcycle.imageUrl ? (
+                      <Image 
+                        src={motorcycle.imageUrl}
+                        alt={motorcycle.name}
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <Bike size={14} className="text-red-200" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-white truncate">{motorcycle.name}</p>
+                    <p className="text-xs text-red-300">Maintenance needed</p>
+                  </div>
+                  <Calendar size={14} className="text-red-300" />
+                </Link>
+              ))}
+              
+              <Link 
+                href="/maintenance" 
+                className="mt-1 text-center block w-full text-xs text-red-300 hover:text-red-200 py-1"
+              >
+                View all overdue tasks
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="mx-6 my-4 border-t border-gray-700/50" />
@@ -184,6 +319,13 @@ export default function Sidebar() {
           )}
         </div>
       </motion.aside>
+
+      {/* Mileage Update Modal */}
+      {showMileageModal && (
+        <MileageUpdateModal 
+          onClose={() => setShowMileageModal(false)} 
+        />
+      )}
     </>
   );
 }
