@@ -14,6 +14,7 @@ interface Motorcycle {
   currentMileage: number | null;
   imageUrl: string | null;
   isDefault: boolean;
+  isOwned?: boolean;
 }
 
 interface MileageUpdateModalProps {

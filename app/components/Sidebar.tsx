@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bike, Home, Wrench, History, BarChart3, Settings,
   User, LogOut, Menu, X, ChevronDown, AlertCircle,
-  Plus, Gauge, Tool, Bell, Calendar
+  Plus, Gauge, Bell, Calendar
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import MileageUpdateModal from "./MileageUpdateModal"; // Create this component separately

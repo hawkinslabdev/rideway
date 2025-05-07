@@ -118,10 +118,10 @@ export default function MotorcycleDetail() {
           const logs = [];
           
           // Add maintenance records as activity
-          data.recentMaintenance.forEach((record) => {
+          data.recentMaintenance.forEach((record: MaintenanceRecord) => {
             logs.push({
               id: record.id,
-              type: 'maintenance',
+              type: 'maintenance' as const,
               date: new Date(record.date),
               description: `Performed ${record.task}`,
               details: {
@@ -137,7 +137,7 @@ export default function MotorcycleDetail() {
           if (data.motorcycle.createdAt) {
             logs.push({
               id: 'creation',
-              type: 'mileageUpdate',
+              type: 'mileageUpdate' as const,
               date: new Date(data.motorcycle.createdAt),
               description: "Motorcycle added to garage",
               details: {
@@ -555,7 +555,7 @@ export default function MotorcycleDetail() {
                       id: task.id,
                       task: task.name,
                       description: task.description,
-                      dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+                      dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
                       dueMileage: task.dueMileage,
                       priority: task.priority,
                       isDue: task.isDue,
