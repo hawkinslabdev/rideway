@@ -41,8 +41,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
     // Ensure mileage is stored as a number
     const currentMileage = body.currentMileage 
       ? parseInt(body.currentMileage) 

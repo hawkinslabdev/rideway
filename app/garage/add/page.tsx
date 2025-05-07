@@ -74,27 +74,18 @@ export default function AddMotorcycle() {
       const displayMileage = DistanceUtil.parseInput(formData.currentMileage);
       const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
 
-      // Create FormData to handle file upload
-      const submitData = new FormData();
-      
-      // Add all form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        submitData.append(key, value.toString());
-      });
-      
-      // Add the converted mileage
-      if (storageMileage !== null) {
-        submitData.append("currentMileage", storageMileage.toString());
-      }
-      
-      // Add image file if present
-      if (imageFile) {
-        submitData.append('image', imageFile);
-      }
+      // Prepare JSON payload
+      const submitData = {
+        ...formData,
+        currentMileage: storageMileage !== null ? storageMileage : undefined,
+      };
 
       const response = await fetch("/api/motorcycles", {
         method: "POST",
-        body: submitData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
@@ -102,7 +93,7 @@ export default function AddMotorcycle() {
       }
 
       const newMotorcycle = await response.json();
-      
+
       if (isInitialSetup) {
         router.push('/?welcome=true');
       } else {

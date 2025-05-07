@@ -81,11 +81,6 @@ export default function MaintenancePage() {
         const savedMotorcycleTab = localStorage.getItem('rideway-active-motorcycle-tab');
         if (savedMotorcycleTab) {
           setActiveMotorcycleTab(savedMotorcycleTab);
-          
-          // Also update the motorcycle filter based on saved tab if it's not "all"
-          if (savedMotorcycleTab !== "all") {
-            setSelectedMotorcycles([savedMotorcycleTab]);
-          }
         }
       } catch (err) {
         console.error('Failed to load active motorcycle tab:', err);
@@ -154,13 +149,6 @@ export default function MaintenancePage() {
     // Save preference to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('rideway-active-motorcycle-tab', motorcycleId);
-    }
-    
-    // Update the motorcycle filter
-    if (motorcycleId === "all") {
-      setSelectedMotorcycles([]);
-    } else {
-      setSelectedMotorcycles([motorcycleId]);
     }
   };
 
@@ -380,7 +368,7 @@ export default function MaintenancePage() {
       if (!tasksResponse.ok) {
         throw new Error("Failed to refresh maintenance tasks");
       }
-      const tasksData = await response.json();
+      const tasksData = await tasksResponse.json();
       setMaintenanceTasks(tasksData.tasks);
       
       // Show success message
