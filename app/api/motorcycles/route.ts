@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import { randomUUID } from "crypto";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
 
 export async function GET() {
   try {
@@ -41,14 +43,75 @@ export async function POST(request: Request) {
       );
     }
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+    // Check content type to determine how to process the request
+    const contentType = request.headers.get('content-type');
+    let body: any = {};
+    let imageUrl: string | null = null;
+
+    if (contentType?.includes('multipart/form-data')) {
+      // Handle form data with file upload
+      const formData = await request.formData();
+      
+      // Extract form fields
+      const fields = ['name', 'make', 'model', 'vin', 'color', 'notes'];
+      fields.forEach(field => {
+        const value = formData.get(field);
+        if (value !== null) {
+          body[field] = value.toString();
+        }
+      });
+
+      // Handle numeric fields
+      const year = formData.get('year');
+      if (year) {
+        body.year = parseInt(year.toString());
+      }
+
+      const currentMileage = formData.get('currentMileage');
+      if (currentMileage) {
+        body.currentMileage = parseInt(currentMileage.toString());
+      }
+
+      // Handle date fields
+      const purchaseDate = formData.get('purchaseDate');
+      if (purchaseDate && purchaseDate.toString().trim() !== '') {
+        body.purchaseDate = new Date(purchaseDate.toString());
+      }
+      
+      // Handle image upload
+      const imageFile = formData.get('image') as File | null;
+      if (imageFile && imageFile.size > 0) {
+        const bytes = await imageFile.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        
+        // Create a unique filename
+        const extension = imageFile.name.split('.').pop();
+        const randomString = Math.random().toString(36).substring(2, 15);
+        const filename = `${Date.now()}-${randomString}.${extension}`;
+        const publicPath = join(process.cwd(), 'public', 'uploads');
+        const filePath = join(publicPath, filename);
+        
+        // Ensure the uploads directory exists
+        try {
+          await mkdir(publicPath, { recursive: true });
+        } catch (error) {
+          // Directory might already exist
+        }
+        
+        // Save the file
+        await writeFile(filePath, buffer);
+        imageUrl = `/uploads/${filename}`;
+      }
+    } else {
+      // Handle regular JSON data
+      try {
+        body = await request.json();
+      } catch (error) {
+        return NextResponse.json(
+          { error: "Invalid JSON body" },
+          { status: 400 }
+        );
+      }
     }
 
     // Ensure mileage is stored as a number
@@ -72,7 +135,7 @@ export async function POST(request: Request) {
       color: body.color || null,
       purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
       currentMileage: currentMileage,
-      imageUrl: body.imageUrl || null,
+      imageUrl: imageUrl || body.imageUrl || null,
       notes: body.notes || null,
       isDefault: isDefault,
       isOwned: true, 

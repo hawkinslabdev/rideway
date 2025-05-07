@@ -1,122 +1,182 @@
 // app/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import ClientLayout from "./components/ClientLayout";
-import { Bike, Calendar, Wrench, AlertTriangle, BarChart, Clock, Gauge, Plus, ArrowRight } from "lucide-react";
-import { format } from "date-fns";
-import { useSettings } from "./contexts/SettingsContext";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
+import ClientLayout from "./components/ClientLayout";
+import { 
+  Bike, Wrench, Check, Clock, AlertTriangle, 
+  Plus, BarChart3, ArrowRight, Calendar, Gauge,
+  ChevronRight, Award, Bell, LayoutDashboard,
+  Settings, Info, Shield, Zap, Star, X
+} from "lucide-react";
+import { format, isToday, isPast, addDays, formatDistance as formatDateDistance } from "date-fns";
+import { useSettings } from "./contexts/SettingsContext";
+import WelcomeModal from "./components/WelcomeModal";
 
-interface Motorcycle {
-  id: string;
-  name: string;
-  make: string;
-  model: string;
-  year: number;
-  currentMileage: number | null;
-  imageUrl: string | null;
-}
-
-interface MaintenanceTask {
-  id: string;
-  motorcycle: string;
-  motorcycleId: string;
-  task: string;
-  dueDate: string | null;
-  dueMileage: number | null;
-  currentMileage: number | null;
-  priority: string;
-  isDue: boolean;
-}
-
-interface DashboardData {
-  motorcycles: Motorcycle[];
-  upcomingMaintenance: MaintenanceTask[];
-  overdueCount: number;
-}
-
-export default function Home() {
+export default function Dashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const showWelcome = searchParams.get('welcome') === 'true';
+  const setupSuccess = searchParams.get('setup') === 'success';
   const { formatDistance } = useSettings();
-  const [data, setData] = useState<DashboardData>({
-    motorcycles: [],
-    upcomingMaintenance: [],
-    overdueCount: 0,
-  });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [stats, setStats] = useState({
+    totalMiles: 0,
+    maintenanceCost: 0,
+    motorcyclesCount: 0,
+    completedTasks: 0
+  });
+  const [isFirstVisit, setIsFirstVisit] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
-  const [selectedMotorcycle, setSelectedMotorcycle] = useState<string>("");
-  const [newMileage, setNewMileage] = useState<string>("");
-
+  const [selectedMotorcycle, setSelectedMotorcycle] = useState<any>(null);
+  const [newMileage, setNewMileage] = useState("");
+  const [updatingMileage, setUpdatingMileage] = useState(false);
+  
   useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        const response = await fetch("/api/dashboard");
-        if (!response.ok) {
-          throw new Error("Failed to fetch dashboard data");
-        }
-        const dashboardData = await response.json();
-        setData(dashboardData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
+    // Check if this is the user's first visit
+    const firstVisit = localStorage.getItem('rideway-first-visit') !== 'false';
+    setIsFirstVisit(firstVisit);
+    
+    // After showing welcome, mark as visited
+    if (showWelcome) {
+      localStorage.setItem('rideway-first-visit', 'false');
     }
-
+  }, [showWelcome]);
+  
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+      return;
+    }
+    
+    if (status !== "authenticated") return;
+    
     fetchDashboardData();
-  }, []);
+  }, [status, router]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch dashboard data
+      const response = await fetch("/api/dashboard");
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard data");
+      }
+      
+      const data = await response.json();
+      setDashboardData(data);
+      
+      // Calculate stats
+      if (data.motorcycles && data.motorcycles.length > 0) {
+        const totalMiles = data.motorcycles.reduce((acc: number, moto: any) => 
+          acc + (moto.currentMileage || 0), 0);
+        
+        // Find the default motorcycle for the mileage update feature
+        const defaultMotorcycle = data.motorcycles.find((m: any) => m.isDefault) || 
+                                  data.motorcycles[0];
+        setSelectedMotorcycle(defaultMotorcycle);
+        
+        if (defaultMotorcycle?.currentMileage) {
+          setNewMileage(defaultMotorcycle.currentMileage.toString());
+        }
+        
+        setStats({
+          totalMiles,
+          maintenanceCost: 0, // This would need another API call
+          motorcyclesCount: data.motorcycles.length,
+          completedTasks: 0 // This would need another API call
+        });
+      }
+    } catch (err) {
+      console.error("Dashboard error:", err);
+      setError("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleMileageUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!selectedMotorcycle || !newMileage) return;
-
+    
     try {
-      const response = await fetch(`/api/motorcycles/${selectedMotorcycle}`, {
+      setUpdatingMileage(true);
+      
+      // Validate mileage (should be greater than current)
+      const mileageValue = parseInt(newMileage);
+      if (isNaN(mileageValue) || mileageValue < 0) {
+        throw new Error("Please enter a valid mileage value");
+      }
+      
+      if (selectedMotorcycle.currentMileage && mileageValue < selectedMotorcycle.currentMileage) {
+        throw new Error("New mileage cannot be less than current mileage");
+      }
+      
+      // Update mileage
+      const response = await fetch(`/api/motorcycles/${selectedMotorcycle.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          currentMileage: parseInt(newMileage),
+          currentMileage: mileageValue,
         }),
       });
-
+      
       if (!response.ok) {
         throw new Error("Failed to update mileage");
       }
-
-      // Refresh dashboard data
-      const dashboardResponse = await fetch("/api/dashboard");
-      const dashboardData = await dashboardResponse.json();
-      setData(dashboardData);
       
-      // Reset form and close modal
-      setNewMileage("");
+      // Log mileage update
+      await fetch("/api/motorcycles/mileage-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          motorcycleId: selectedMotorcycle.id,
+          previousMileage: selectedMotorcycle.currentMileage,
+          newMileage: mileageValue,
+          notes: `Updated mileage from ${formatDistance(selectedMotorcycle.currentMileage || 0)} to ${formatDistance(mileageValue)}`
+        }),
+      });
+      
+      // Close modal and refresh data
       setShowMileageModal(false);
+      toast.success(`Updated mileage for ${selectedMotorcycle.name}`, {
+        position: "bottom-center",
+      });
+      
+      // Refresh dashboard data
+      await fetchDashboardData();
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update mileage");
+      toast.error(err instanceof Error ? err.message : "Failed to update mileage");
+    } finally {
+      setUpdatingMileage(false);
     }
   };
-
-  const openMileageModal = () => {
-    if (data.motorcycles.length > 0) {
-      // Default to first motorcycle in the list
-      const firstMotorcycle = data.motorcycles[0];
-      setSelectedMotorcycle(firstMotorcycle.id);
-      setNewMileage(firstMotorcycle.currentMileage?.toString() || "");
-      setShowMileageModal(true);
-    } else {
-      // No motorcycles available
-      setError("Please add a motorcycle first");
-    }
+  
+  const openMileageModal = (motorcycle: any) => {
+    setSelectedMotorcycle(motorcycle);
+    setNewMileage(motorcycle.currentMileage?.toString() || "");
+    setShowMileageModal(true);
   };
-
-  if (loading) {
+  
+  if (status === "loading" || loading) {
     return (
       <ClientLayout>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
+        <main className="flex-1 overflow-auto p-6">
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
@@ -128,160 +188,854 @@ export default function Home() {
   if (error) {
     return (
       <ClientLayout>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800">Error: {error}</p>
+        <main className="flex-1 overflow-auto p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
+              <p className="text-red-800">{error}</p>
+            </div>
           </div>
         </main>
       </ClientLayout>
     );
   }
+  
+  const getPriorityClass = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'medium':
+        return 'text-amber-600 bg-amber-50 border-amber-200';
+      default:
+        return 'text-green-600 bg-green-50 border-green-200';
+    }
+  };
+  
+  const getFormattedDueDate = (dueDate: string) => {
+    const date = new Date(dueDate);
+    if (isToday(date)) return 'Today';
+    if (isPast(date)) return `${format(date, 'MMM d')} (Overdue)`;
+    
+    const daysUntil = Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntil <= 7) return `In ${daysUntil} days`;
+    return format(date, 'MMM d');
+  };
+  
+  // Get default motorcycle
+  const defaultMotorcycle = dashboardData?.motorcycles?.find((m: any) => m.isDefault) || 
+                            dashboardData?.motorcycles?.[0];
 
+  // Calculate maintenance health percentage
+  const calculateMaintenanceHealth = () => {
+    if (!dashboardData) return 100;
+    
+    const totalTasks = dashboardData.upcomingMaintenance?.length || 0;
+    if (totalTasks === 0) return 100;
+    
+    const overdueTasks = dashboardData.overdueCount || 0;
+    return Math.max(0, Math.min(100, 100 - (overdueTasks / totalTasks) * 100));
+  };
+  
+  const maintenanceHealth = calculateMaintenanceHealth();
+  
   return (
     <ClientLayout>
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <h1 className="text-2xl font-bold mb-4 md:mb-6">Dashboard</h1>
-
-        {/* Context-aware alerts */}
-        {data.overdueCount > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 md:mb-6">
-            <div className="flex">
-              <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mr-3" />
-              <div>
-                <h3 className="text-sm font-medium text-red-800">
-                  {data.overdueCount} maintenance {data.overdueCount === 1 ? 'task is' : 'tasks are'} overdue
-                </h3>
-                <p className="mt-1 text-sm text-red-700">
-                  Regular maintenance keeps your bike running safely and efficiently.
-                </p>
+      <main className="flex-1 overflow-auto p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Welcome header with action buttons */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center">
+                <LayoutDashboard className="mr-2 text-blue-600 hidden sm:inline" size={26} />
+                Welcome{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}!
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {new Date().getHours() < 12 
+                  ? 'Good morning' 
+                  : new Date().getHours() < 18 
+                    ? 'Good afternoon' 
+                    : 'Good evening'}! Here's your motorcycle maintenance overview.
+              </p>
+            </div>
+            
+            {dashboardData?.motorcycles && dashboardData.motorcycles.length > 0 && (
+              <div className="mt-4 sm:mt-0 flex space-x-2">
                 <Link 
-                  href="/maintenance" 
-                  className="mt-2 inline-flex items-center text-sm font-medium text-red-800 hover:text-red-900"
+                  href="/maintenance/add"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center hover:bg-blue-700 text-sm"
                 >
-                  View overdue tasks
-                  <ArrowRight size={14} className="ml-1" />
+                  <Wrench size={15} className="mr-1.5" />
+                  Log Maintenance
+                </Link>
+                <Link 
+                  href="/garage/add"
+                  className="px-3 py-2 border border-gray-300 rounded-md flex items-center hover:bg-gray-50 text-sm"
+                >
+                  <Plus size={15} className="mr-1.5" />
+                  Add Motorcycle
                 </Link>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Action Panel */}
-        <div className="bg-white rounded-lg shadow p-4 mb-4 md:mb-6">
-          <h2 className="text-base font-semibold mb-4">Quick Actions</h2>
-          <div className="flex flex-wrap gap-3">
-            {data.motorcycles.length === 0 ? (
-              <Link 
-                href="/garage/add" 
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                <Bike size={18} className="mr-2" />
-                Add Your First Motorcycle
-              </Link>
-            ) : (
-              <>
-                <button 
-                  onClick={openMileageModal}
-                  className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                >
-                  <Gauge size={16} className="mr-1.5" />
-                  Update Mileage
-                </button>
-                <Link 
-                  href="/maintenance/add" 
-                  className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                >
-                  <Wrench size={16} className="mr-1.5" />
-                  Add Maintenance
-                </Link>
-                <Link 
-                  href="/history" 
-                  className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                >
-                  <BarChart size={16} className="mr-1.5" />
-                  Service History
-                </Link>
-              </>
             )}
           </div>
-        </div>
-
-        {/* Maintenance Status Indicator */}
-        {data.upcomingMaintenance.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-4 mb-4 md:mb-6">
-            <h2 className="text-sm font-medium text-gray-500 mb-2">Maintenance Status</h2>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className={`h-full ${data.overdueCount > 0 ? 'bg-red-500' : 'bg-green-500'}`}
-                style={{ width: `${100 - (data.overdueCount / data.upcomingMaintenance.length * 100)}%` }}
-              ></div>
+          
+          {/* Setup success message */}
+          {setupSuccess && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start">
+              <div className="bg-green-100 rounded-full p-1 mr-3">
+                <Check size={18} className="text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-green-800">Maintenance plan created!</h3>
+                <p className="text-green-600 text-sm">
+                  You've successfully set up your maintenance schedule. We'll remind you when tasks are due.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {data.overdueCount === 0 
-                ? "All maintenance up to date" 
-                : `${data.overdueCount} of ${data.upcomingMaintenance.length} tasks need attention`}
-            </p>
-          </div>
+          )}
+          
+          {/* No motorcycles message */}
+          {(!dashboardData?.motorcycles || dashboardData.motorcycles.length === 0) && (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+              <div className="p-6 sm:p-8 text-center">
+                <div className="bg-blue-100 rounded-full p-4 w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                  <Bike size={32} className="text-blue-600" />
+                </div>
+                <h2 className="text-xl font-medium mb-2">Welcome to Rideway!</h2>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Add your first motorcycle to start tracking maintenance and mileage.
+                </p>
+                <Link
+                  href="/garage/add?initial=true"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
+                >
+                  <Plus size={18} className="mr-2" />
+                  Add Your First Motorcycle
+                </Link>
+              </div>
+              
+              {/* Feature highlights */}
+              <div className="border-t">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4 text-center">What Rideway can do for you</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div className="flex flex-col items-center text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="bg-blue-100 rounded-full p-3 mb-3">
+                        <Wrench size={20} className="text-blue-600" />
+                      </div>
+                      <h4 className="font-medium mb-2">Track Maintenance</h4>
+                      <p className="text-sm text-gray-600">Keep all your service records in one place and get timely maintenance reminders.</p>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="bg-green-100 rounded-full p-3 mb-3">
+                        <Gauge size={20} className="text-green-600" />
+                      </div>
+                      <h4 className="font-medium mb-2">Log Mileage</h4>
+                      <p className="text-sm text-gray-600">Record your motorcycle's mileage and track how much you ride.</p>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="bg-purple-100 rounded-full p-3 mb-3">
+                        <BarChart3 size={20} className="text-purple-600" />
+                      </div>
+                      <h4 className="font-medium mb-2">Track Costs</h4>
+                      <p className="text-sm text-gray-600">Keep track of all your motorcycle-related expenses in one place.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {dashboardData?.motorcycles && dashboardData.motorcycles.length > 0 && (
+            <>
+              {/* Stats summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                  <div className="bg-blue-100 rounded-full p-3 mr-3">
+                    <Bike size={20} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Motorcycles</p>
+                    <p className="text-xl font-bold">{stats.motorcyclesCount}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                  <div className="bg-green-100 rounded-full p-3 mr-3">
+                    <Gauge size={20} className="text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Total Mileage</p>
+                    <p className="text-xl font-bold">{formatDistance(stats.totalMiles)}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                  <div className={`rounded-full p-3 mr-3 ${dashboardData.overdueCount > 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
+                    <Wrench size={20} className={dashboardData.overdueCount > 0 ? 'text-red-600' : 'text-amber-600'} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Maintenance Due</p>
+                    <p className="text-xl font-bold">{dashboardData.overdueCount || 0}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                  <div className="bg-purple-100 rounded-full p-3 mr-3">
+                    <Check size={20} className="text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Completed Tasks</p>
+                    <p className="text-xl font-bold">{stats.completedTasks}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Main content */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Left column - Motorcycles */}
+                <div>
+                  {/* Primary Motorcycle Card */}
+                  {defaultMotorcycle && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6">
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-4">
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center">
+                            <Star size={14} className="mr-1.5 text-yellow-300 fill-yellow-300" />
+                            <h2 className="text-sm font-medium text-white">Primary Motorcycle</h2>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-2 flex items-center">
+                          {defaultMotorcycle.imageUrl ? (
+                            <img 
+                              src={defaultMotorcycle.imageUrl} 
+                              alt={defaultMotorcycle.name}
+                              className="h-16 w-16 rounded-lg object-cover border-2 border-white/30"
+                            />
+                          ) : (
+                            <div className="h-16 w-16 rounded-lg bg-white/10 flex items-center justify-center border-2 border-white/30">
+                              <Bike size={30} className="text-white" />
+                            </div>
+                          )}
+                          <div className="ml-3">
+                            <h3 className="text-white font-bold text-lg leading-tight">{defaultMotorcycle.name}</h3>
+                            <p className="text-blue-100 text-sm">
+                              {defaultMotorcycle.year} {defaultMotorcycle.make} {defaultMotorcycle.model}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4">
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          <button 
+                            onClick={() => openMileageModal(defaultMotorcycle)}
+                            className="flex items-center bg-gray-100 px-3 py-1.5 rounded-full text-sm hover:bg-gray-200 transition-colors"
+                          >
+                            <Gauge size={14} className="mr-1.5 text-gray-600" />
+                            {defaultMotorcycle.currentMileage 
+                              ? formatDistance(defaultMotorcycle.currentMileage) 
+                              : "No mileage"}
+                          </button>
+                          
+                          {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 && (
+                            <div className={`flex items-center px-3 py-1.5 rounded-full text-sm ${
+                              dashboardData.upcomingMaintenance[0].isDue
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              <Wrench size={14} className="mr-1.5" />
+                              {dashboardData.upcomingMaintenance[0].isDue ? 'Maintenance Due' : 'Next: ' + 
+                                (dashboardData.upcomingMaintenance[0].dueDate
+                                  ? getFormattedDueDate(dashboardData.upcomingMaintenance[0].dueDate)
+                                  : "Based on mileage")}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                          <Link 
+                            href={`/garage/${defaultMotorcycle.id}`}
+                            className="flex-1 px-3 py-2 text-sm text-center bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                          >
+                            View Details
+                          </Link>
+                          <Link 
+                            href={`/maintenance/add?motorcycle=${defaultMotorcycle.id}`}
+                            className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center"
+                          >
+                            <Wrench size={14} className="mr-1" />
+                            Log Maintenance
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Other motorcycles */}
+                  {dashboardData.motorcycles.length > 1 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6">
+                      <div className="flex items-center justify-between p-4 border-b">
+                        <h2 className="text-md font-medium flex items-center">
+                          <Bike size={18} className="mr-2 text-gray-500" />
+                          My Garage
+                        </h2>
+                        <Link 
+                          href="/garage" 
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          View All
+                        </Link>
+                      </div>
+                      
+                      <div className="divide-y">
+                        {dashboardData.motorcycles
+                          .filter((m: any) => m.id !== defaultMotorcycle?.id && m.isOwned !== false)
+                          .slice(0, 3)
+                          .map((motorcycle: any) => (
+                            <div
+                              key={motorcycle.id}
+                              className="flex items-center justify-between p-3 hover:bg-blue-50/50 transition"
+                            >
+                              <Link
+                                href={`/garage/${motorcycle.id}`}
+                                className="flex items-center flex-1"
+                              >
+                                <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                                  {motorcycle.imageUrl ? (
+                                    <img 
+                                      src={motorcycle.imageUrl} 
+                                      alt={motorcycle.name}
+                                      className="h-10 w-10 rounded-lg object-cover"
+                                    />
+                                  ) : (
+                                    <Bike size={20} className="text-gray-500" />
+                                  )}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="font-medium text-gray-900">{motorcycle.name}</p>
+                                  <div className="flex items-center text-xs text-gray-500">
+                                    <span className="mr-2">{motorcycle.make} {motorcycle.model}</span>
+                                    {motorcycle.currentMileage ? (
+                                      <span className="flex items-center text-gray-600">
+                                        <Gauge size={10} className="mr-0.5" />
+                                        {formatDistance(motorcycle.currentMileage)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </Link>
+                              
+                              <div className="flex items-center">
+                                {/* Mileage update button */}
+                                <button
+                                  onClick={() => openMileageModal(motorcycle)}
+                                  className="mr-2 p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                  title="Update Mileage"
+                                >
+                                  <Gauge size={16} />
+                                </button>
+                                
+                                {/* Show maintenance alert if any */}
+                                {dashboardData.upcomingMaintenance && 
+                                dashboardData.upcomingMaintenance.some((t: any) => 
+                                  t.motorcycleId === motorcycle.id && t.isDue) ? (
+                                  <Link
+                                    href={`/maintenance?motorcycle=${motorcycle.id}`}
+                                    className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full"
+                                  >
+                                    Maintenance Due
+                                  </Link>
+                                ) : (
+                                  <ChevronRight size={16} className="text-gray-400" />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                      
+                      <div className="p-4 border-t">
+                        <Link
+                          href="/garage/add"
+                          className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm"
+                        >
+                          <Plus size={16} className="mr-2" />
+                          Add Another Motorcycle
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Maintenance Health Card */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6">
+                    <div className="p-4 border-b">
+                      <h2 className="text-md font-medium flex items-center">
+                        <Shield size={18} className="mr-2 text-gray-500" />
+                        Maintenance Health
+                      </h2>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium">Overall Status</span>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            maintenanceHealth === 100 
+                              ? 'bg-green-100 text-green-800'
+                              : maintenanceHealth >= 75
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                          }`}>
+                            {maintenanceHealth === 100 
+                              ? 'Excellent' 
+                              : maintenanceHealth >= 75 
+                                ? 'Good' 
+                                : maintenanceHealth >= 50
+                                  ? 'Fair'
+                                  : 'Needs Attention'}
+                          </span>
+                        </div>
+                        
+                        {/* Progress bar */}
+                        <div className="h-3 w-full bg-gray-200 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className={`h-full ${
+                              maintenanceHealth === 100 
+                                ? 'bg-green-500' 
+                                : maintenanceHealth >= 75
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                            }`}
+                            style={{ width: `${maintenanceHealth}%` }}
+                          ></div>
+                        </div>
+                        
+                        <div className="mt-1 text-xs text-gray-500 text-right">
+                          {maintenanceHealth}% healthy
+                        </div>
+                      </div>
+                      
+                      {/* Motorcycle-specific status */}
+                      <div className="mt-4 space-y-2">
+                        <h3 className="text-sm font-medium">Individual Status</h3>
+                        
+                        {dashboardData.motorcycles.filter((m: any) => m.isOwned !== false).map((motorcycle: any) => {
+                          // Find overdue tasks for this motorcycle
+                          const motorcycleTasks = dashboardData.upcomingMaintenance?.filter(
+                            (t: any) => t.motorcycleId === motorcycle.id
+                          ) || [];
+                          
+                          const overdueTasks = motorcycleTasks.filter((t: any) => t.isDue);
+                          const healthPercentage = motorcycleTasks.length > 0 
+                            ? 100 - (overdueTasks.length / motorcycleTasks.length * 100)
+                            : 100;
+                            
+                          return (
+                            <div key={motorcycle.id} className="flex items-center space-x-2">
+                              <div className="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                                {motorcycle.imageUrl ? (
+                                  <img 
+                                    src={motorcycle.imageUrl} 
+                                    alt={motorcycle.name}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <Bike size={16} className="text-gray-500" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium truncate">{motorcycle.name}</p>
+                                  <div className={`ml-2 h-2 w-2 rounded-full ${
+                                    healthPercentage === 100 
+                                      ? 'bg-green-500' 
+                                      : healthPercentage >= 75 
+                                        ? 'bg-yellow-500' 
+                                        : 'bg-red-500'
+                                  }`}></div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                                  <div 
+                                    className={`h-full rounded-full ${
+                                      healthPercentage === 100 
+                                        ? 'bg-green-500' 
+                                        : healthPercentage >= 75
+                                          ? 'bg-yellow-500'
+                                          : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${healthPercentage}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Actions */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="text-md font-medium flex items-center">
+                        <Zap size={18} className="mr-2 text-gray-500" />
+                        Quick Actions
+                      </h2>
+                    </div>
+                    
+                    <div className="p-4 space-y-2">
+                      <Link 
+                        href="/maintenance/add"
+                        className="flex items-center justify-between p-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"
+                      >
+                        <div className="flex items-center">
+                          <Wrench size={18} className="mr-2" />
+                          <span>Log Maintenance</span>
+                        </div>
+                        <ArrowRight size={16} />
+                      </Link>
+                      
+                      <Link 
+                        href="/garage/add"
+                        className="flex items-center justify-between p-3 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition"
+                      >
+                        <div className="flex items-center">
+                          <Bike size={18} className="mr-2" />
+                          <span>Add Motorcycle</span>
+                        </div>
+                        <ArrowRight size={16} />
+                      </Link>
+                      
+                      <Link 
+                        href="/maintenance/setup"
+                        className="flex items-center justify-between p-3 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition"
+                      >
+                        <div className="flex items-center">
+                          <Calendar size={18} className="mr-2" />
+                          <span>Set Up Schedule</span>
+                        </div>
+                        <ArrowRight size={16} />
+                      </Link>
+                      
+                      <Link 
+                        href="/settings"
+                        className="flex items-center justify-between p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition"
+                      >
+                        <div className="flex items-center">
+                          <Settings size={18} className="mr-2" />
+                          <span>Settings</span>
+                        </div>
+                        <ArrowRight size={16} />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Center/Right columns - Maintenance */}
+                <div className="lg:col-span-2">
+                  {/* Maintenance Alert Card */}
+                  {dashboardData.overdueCount > 0 ? (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <div className="flex">
+                        <div className="bg-red-100 rounded-full p-2 mr-4 flex-shrink-0">
+                          <AlertTriangle size={22} className="text-red-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center text-red-800 font-medium text-lg">
+                            <span>{dashboardData.overdueCount} overdue {dashboardData.overdueCount === 1 ? 'task' : 'tasks'}</span>
+                          </div>
+                          <p className="text-red-700 mt-1">
+                            You have maintenance items that require attention. Keeping up with maintenance helps ensure your ride is safe and reliable.
+                          </p>
+                          {dashboardData.upcomingMaintenance && 
+                           dashboardData.upcomingMaintenance.some((t: any) => t.isDue) && (
+                            <Link
+                              href="/maintenance"
+                              className="mt-3 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                            >
+                              View Overdue Tasks
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                      <div className="flex">
+                        <div className="bg-green-100 rounded-full p-2 mr-4 flex-shrink-0">
+                          <Shield size={22} className="text-green-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center text-green-800 font-medium text-lg">
+                            <span>Maintenance up to date</span>
+                          </div>
+                          <p className="text-green-700 mt-1">
+                            All your maintenance tasks are up to date. Great job keeping your motorcycles in top condition!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                
+                  {/* Upcoming maintenance */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6">
+                    <div className="flex items-center justify-between p-4 border-b">
+                      <h2 className="text-md font-medium flex items-center">
+                        <Calendar size={18} className="mr-2 text-gray-500" />
+                        Upcoming Maintenance
+                      </h2>
+                      <Link 
+                        href="/maintenance" 
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        View All
+                      </Link>
+                    </div>
+                    
+                    <div className="divide-y">
+                      {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 ? (
+                        dashboardData.upcomingMaintenance.map((task: any) => (
+                          <div key={task.id} className="p-4 hover:bg-gray-50 transition">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-medium">{task.task}</h3>
+                                <p className="text-sm text-gray-500">{task.motorcycle}</p>
+                                <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                                  {task.dueDate && (
+                                    <span className={`flex items-center px-2 py-1 rounded-full border ${
+                                      task.isDue ? 'text-red-600 bg-red-50 border-red-200' : 'text-blue-600 bg-blue-50 border-blue-200'
+                                    }`}>
+                                      <Calendar size={12} className="mr-1" />
+                                      {getFormattedDueDate(task.dueDate)}
+                                    </span>
+                                  )}
+                                  
+                                  {task.dueMileage && (
+                                    <span className={`flex items-center px-2 py-1 rounded-full border ${
+                                      task.isDue ? 'text-red-600 bg-red-50 border-red-200' : 'text-blue-600 bg-blue-50 border-blue-200'
+                                    }`}>
+                                      <Gauge size={12} className="mr-1" />
+                                      {formatDistance(task.dueMileage)}
+                                    </span>
+                                  )}
+                                  
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full border ${
+                                    task.priority === 'high'
+                                      ? 'text-red-600 bg-red-50 border-red-200' 
+                                      : task.priority === 'medium'
+                                        ? 'text-amber-600 bg-amber-50 border-amber-200'
+                                        : 'text-green-600 bg-green-50 border-green-200'
+                                  }`}>
+                                    <span className="capitalize">{task.priority}</span>
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex-shrink-0">
+                                <Link 
+                                  href={`/maintenance/${task.id}/complete`}
+                                  className={`px-3 py-1.5 text-sm rounded-md flex items-center ${
+                                    task.isDue 
+                                      ? 'bg-red-600 text-white hover:bg-red-700' 
+                                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                                  }`}
+                                >
+                                  <Check size={14} className="mr-1" />
+                                  Complete
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center">
+                          <div className="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                            <Wrench size={22} className="text-gray-400" />
+                          </div>
+                          <h3 className="text-gray-600 font-medium mb-2">No upcoming maintenance</h3>
+                          <p className="text-gray-500 text-sm mb-4">
+                            Add maintenance tasks to keep track of your motorcycle's health.
+                          </p>
+                          <Link
+                            href={defaultMotorcycle ? `/maintenance/add?motorcycle=${defaultMotorcycle.id}` : "/maintenance/add"}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          >
+                            <Plus size={16} className="mr-2" />
+                            Add Maintenance Task
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Maintenance Summary Card */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="flex items-center justify-between p-4 border-b">
+                      <h2 className="text-md font-medium flex items-center">
+                        <Info size={18} className="mr-2 text-gray-500" />
+                        Maintenance Insights
+                      </h2>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div className="space-y-4">
+                        {/* Current status visualization */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-sm font-medium text-gray-700">Maintenance Status</h3>
+                            <span className="text-xs text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
+                              Last updated: {format(new Date(), 'MMM d')}
+                            </span>
+                          </div>
+                          
+                          {dashboardData.overdueCount > 0 ? (
+                            <div className="bg-gray-100 rounded-lg p-3 relative overflow-hidden">
+                              <div className="absolute left-0 top-0 bottom-0 bg-red-500" style={{ width: `${Math.min(100, dashboardData.overdueCount * 20)}%` }}></div>
+                              <div className="relative flex justify-between items-center">
+                                <span className="font-medium text-sm">
+                                  {dashboardData.overdueCount} overdue {dashboardData.overdueCount === 1 ? 'task' : 'tasks'}
+                                </span>
+                                <span className="text-sm bg-white px-2 py-0.5 rounded shadow-sm">
+                                  Needs attention
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 rounded-lg p-3 relative overflow-hidden">
+                              <div className="absolute left-0 top-0 bottom-0 bg-green-500" style={{ width: '100%' }}></div>
+                              <div className="relative flex justify-between items-center">
+                                <span className="font-medium text-sm text-white">
+                                  All maintenance up to date
+                                </span>
+                                <span className="text-sm bg-white px-2 py-0.5 rounded shadow-sm">
+                                  Good condition
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Next maintenance info */}
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2">Next Maintenance</h3>
+                          {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 ? (
+                            <div className="bg-gray-100 rounded-lg p-3">
+                              <p className="text-sm font-medium">
+                                {dashboardData.upcomingMaintenance[0].task} for {dashboardData.upcomingMaintenance[0].motorcycle}
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {dashboardData.upcomingMaintenance[0].dueDate && (
+                                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">
+                                    <Clock size={12} className="mr-1" />
+                                    {getFormattedDueDate(dashboardData.upcomingMaintenance[0].dueDate)}
+                                  </span>
+                                )}
+                                {dashboardData.upcomingMaintenance[0].dueMileage && (
+                                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">
+                                    <Gauge size={12} className="mr-1" />
+                                    At {formatDistance(dashboardData.upcomingMaintenance[0].dueMileage)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 rounded-lg p-3">
+                              <p className="text-sm text-gray-600">No upcoming maintenance tasks scheduled</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Recent activity list */}
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Activity</h3>
+                          <div className="bg-gray-100 rounded-lg p-2 space-y-1 max-h-32 overflow-y-auto">
+                            {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 ? (
+                              // Just showing some mock activity for demonstration
+                              <>
+                                <div className="text-xs p-2 rounded hover:bg-gray-200">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">Mileage updated</span>
+                                    <span className="text-gray-500">{format(new Date(), 'MMM d')}</span>
+                                  </div>
+                                  <p className="text-gray-600 mt-0.5">{defaultMotorcycle.name}: {formatDistance(defaultMotorcycle.currentMileage || 0)}</p>
+                                </div>
+                                <div className="text-xs p-2 rounded hover:bg-gray-200">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">Maintenance completed</span>
+                                    <span className="text-gray-500">{format(addDays(new Date(), -3), 'MMM d')}</span>
+                                  </div>
+                                  <p className="text-gray-600 mt-0.5">Oil Change for {defaultMotorcycle.name}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-xs text-gray-600 p-2">No recent activity</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Schedule button */}
+                        <div className="pt-2">
+                          <Link
+                            href="/maintenance"
+                            className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          >
+                            <Calendar size={16} className="mr-2" />
+                            View Maintenance Schedule
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        
+        {/* Welcome modal */}
+        {showWelcome && isFirstVisit && dashboardData?.motorcycles?.length > 0 && (
+          <WelcomeModal 
+            motorcycleName={dashboardData.motorcycles[0].name} 
+            motorcycleId={dashboardData.motorcycles[0].id} 
+          />
         )}
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6 mb-4 md:mb-6">
-          <div className="bg-white rounded-lg shadow p-4 md:p-6">
-            <div className="flex items-center justify-between mb-2 md:mb-4">
-              <h2 className="text-base md:text-lg font-semibold">Motorcycles</h2>
-              <Bike className="text-blue-500" size={20} />
-            </div>
-            <p className="text-2xl md:text-3xl font-bold">{data.motorcycles.length}</p>
-            <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">in your garage</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4 md:p-6">
-            <div className="flex items-center justify-between mb-2 md:mb-4">
-              <h2 className="text-base md:text-lg font-semibold">Upcoming</h2>
-              <Calendar className="text-green-500" size={20} />
-            </div>
-            <p className="text-2xl md:text-3xl font-bold">{data.upcomingMaintenance.length}</p>
-            <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">maintenance tasks</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4 md:p-6">
-            <div className="flex items-center justify-between mb-2 md:mb-4">
-              <h2 className="text-base md:text-lg font-semibold">Overdue</h2>
-              <AlertTriangle className="text-red-500" size={20} />
-            </div>
-            <p className="text-2xl md:text-3xl font-bold">{data.overdueCount}</p>
-            <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">maintenance tasks</p>
-          </div>
-        </div>
-
+        
         {/* Mileage Update Modal */}
-        {showMileageModal && (
+        {showMileageModal && selectedMotorcycle && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-medium mb-4">Update Mileage</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Update Mileage</h3>
+                <button 
+                  onClick={() => setShowMileageModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
               <form onSubmit={handleMileageUpdate}>
                 <div className="mb-4">
-                  <label htmlFor="motorcycleSelect" className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Motorcycle
-                  </label>
-                  <select
-                    id="motorcycleSelect"
-                    value={selectedMotorcycle}
-                    onChange={(e) => {
-                      const selected = data.motorcycles.find(m => m.id === e.target.value);
-                      setSelectedMotorcycle(e.target.value);
-                      setNewMileage(selected?.currentMileage?.toString() || "");
-                    }}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  >
-                    {data.motorcycles.map(moto => (
-                      <option key={moto.id} value={moto.id}>
-                        {moto.name} ({moto.year} {moto.make} {moto.model})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="mb-4">
+                  <div className="flex items-center mb-4">
+                    {selectedMotorcycle.imageUrl ? (
+                      <img 
+                        src={selectedMotorcycle.imageUrl} 
+                        alt={selectedMotorcycle.name}
+                        className="h-12 w-12 rounded-lg object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center mr-3">
+                        <Bike size={24} className="text-gray-500" />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-medium">{selectedMotorcycle.name}</h4>
+                      <p className="text-sm text-gray-500">{selectedMotorcycle.year} {selectedMotorcycle.make} {selectedMotorcycle.model}</p>
+                    </div>
+                  </div>
+                  
                   <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
                     Current Mileage
                   </label>
@@ -291,11 +1045,10 @@ export default function Home() {
                       name="mileage"
                       id="mileage"
                       required
-                      min="0"
-                      step="1"
+                      min={selectedMotorcycle.currentMileage || 0}
                       value={newMileage}
                       onChange={(e) => setNewMileage(e.target.value)}
-                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-16 sm:text-sm border-gray-300 rounded-md"
                       placeholder="Enter current mileage"
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -304,279 +1057,40 @@ export default function Home() {
                       </span>
                     </div>
                   </div>
+                  {selectedMotorcycle.currentMileage && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Current reading: {formatDistance(selectedMotorcycle.currentMileage)}
+                    </p>
+                  )}
                 </div>
+                
                 <div className="flex justify-end space-x-3">
                   <button
                     type="button"
                     onClick={() => setShowMileageModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    disabled={updatingMileage}
+                    className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   >
-                    Save
+                    {updatingMileage ? (
+                      <>
+                        <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Mileage'
+                    )}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
-
-        {/* Maintenance Table - Responsive Mobile Design */}
-        <div className="bg-white rounded-lg shadow mb-4 md:mb-6 overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-base md:text-lg font-semibold">Upcoming Maintenance</h2>
-            <Link 
-              href="/maintenance" 
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              View All
-            </Link>
-          </div>
-          
-          {/* Mobile List View (visible on small screens) */}
-          <div className="sm:hidden">
-            {data.upcomingMaintenance.length > 0 ? (
-              <div className="divide-y divide-gray-200">
-                {data.upcomingMaintenance.map((task) => (
-                  <div key={task.id} className={`p-4 ${task.isDue ? 'bg-red-50' : ''}`}>
-                    <div className="flex justify-between mb-1">
-                      <h3 className="font-medium text-sm">{task.task}</h3>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          task.priority === "high"
-                            ? "bg-red-100 text-red-800"
-                            : task.priority === "medium"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {task.priority}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-2">{task.motorcycle}</p>
-                    <div className="flex flex-col space-y-1 mb-3 text-xs">
-                      {task.dueDate && (
-                        <div className="flex items-center">
-                          <Clock size={12} className="mr-1 text-gray-500" />
-                          <span>{format(new Date(task.dueDate), "MMM d, yyyy")}</span>
-                        </div>
-                      )}
-                      {task.dueMileage && (
-                        <div className="flex items-center">
-                          <Gauge size={12} className="mr-1 text-gray-500" />
-                          <span>{formatDistance(task.dueMileage)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Link 
-                      href={`/maintenance/${task.id}/complete`}
-                      className={`text-xs px-3 py-1.5 rounded-md inline-block ${
-                        task.isDue 
-                          ? "bg-red-600 text-white hover:bg-red-700" 
-                          : "bg-blue-600 text-white hover:bg-blue-700"
-                      }`}
-                    >
-                      {task.isDue ? "Overdue - Complete" : "Complete"}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 text-center text-gray-500 text-sm">
-                No upcoming maintenance tasks
-              </div>
-            )}
-          </div>
-          
-          {/* Desktop Table View (hidden on small screens) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left">Motorcycle</th>
-                  <th className="px-6 py-3 text-left">Task</th>
-                  <th className="px-6 py-3 text-left">Due Date</th>
-                  <th className="px-6 py-3 text-left">Due Mileage</th>
-                  <th className="px-6 py-3 text-left">Priority</th>
-                  <th className="px-6 py-3 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-              {data.upcomingMaintenance.map((task) => (
-                  <tr key={task.id} className={`hover:bg-gray-50 ${task.isDue ? 'bg-red-50' : ''}`}>
-                    <td className="px-6 py-4">{task.motorcycle}</td>
-                    <td className="px-6 py-4">{task.task}</td>
-                    <td className="px-6 py-4">
-                      {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "N/A"}
-                    </td>
-                    <td className="px-6 py-4">
-                      {/* Enhanced display showing both absolute and relative values */}
-                      {task.dueMileage ? (
-                        <div>
-                          <span className="font-medium">{formatDistance(task.dueMileage)}</span>
-                          {task.currentMileage && task.dueMileage && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {task.currentMileage < task.dueMileage ? (
-                                <>
-                                  <span className="font-medium text-green-600">
-                                    {formatDistance(task.dueMileage - task.currentMileage)} remaining
-                                  </span>
-                                  {task.intervalMiles && (
-                                    <span className="ml-1">
-                                      ({Math.round(((task.intervalMiles - (task.dueMileage - task.currentMileage)) / task.intervalMiles) * 100)}% complete)
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="font-medium text-red-600">
-                                  {formatDistance(task.currentMileage - task.dueMileage)} overdue
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : "N/A"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          task.priority === "high"
-                            ? "bg-red-100 text-red-800"
-                            : task.priority === "medium"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {task.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link 
-                        href={`/maintenance/${task.id}/complete`}
-                        className={`px-3 py-1 rounded-md text-xs font-medium ${
-                          task.isDue 
-                            ? "bg-red-600 text-white hover:bg-red-700" 
-                            : "text-blue-600 hover:text-blue-900"
-                        }`}
-                      >
-                        {task.isDue ? "Overdue - Complete" : "Complete"}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {data.upcomingMaintenance.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No upcoming maintenance tasks
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Motorcycles Grid - Responsive Design */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-base md:text-lg font-semibold">My Garage</h2>
-            <Link 
-              href="/garage" 
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              View All
-            </Link>
-          </div>
-          <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-            {data.motorcycles.map((motorcycle) => {
-              // Find maintenance tasks for this bike
-              const motorcycleTasks = data.upcomingMaintenance.filter(
-                task => task.motorcycleId === motorcycle.id
-              );
-              const hasDueTasks = motorcycleTasks.some(task => task.isDue);
-              
-              return (
-                <div 
-                  key={motorcycle.id} 
-                  className={`border rounded-lg overflow-hidden flex flex-col ${
-                    hasDueTasks ? 'border-red-300' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="h-32 md:h-40 bg-gray-200 flex items-center justify-center">
-                    {motorcycle.imageUrl ? (
-                      <img 
-                        src={motorcycle.imageUrl} 
-                        alt={motorcycle.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Bike size={48} className="text-gray-400" />
-                    )}
-                  </div>
-                  
-                  {/* Add maintenance summary badge if needed */}
-                  {hasDueTasks && (
-                    <div className="bg-red-100 px-4 py-1.5 text-xs">
-                      <span className="font-medium text-red-800">
-                        {motorcycleTasks.filter(t => t.isDue).length} maintenance {motorcycleTasks.filter(t => t.isDue).length === 1 ? 'task' : 'tasks'} due
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="p-4">
-                    <h3 className="font-semibold text-base md:text-lg">{motorcycle.name}</h3>
-                    <p className="text-xs md:text-sm text-gray-500">
-                      {motorcycle.year} {motorcycle.make} {motorcycle.model}
-                    </p>
-                    <div className="mt-3 md:mt-4 flex justify-between items-center">
-                      <div>
-                        <p className="text-xs text-gray-500">Current mileage</p>
-                        <p className="font-medium text-sm">
-                          {motorcycle.currentMileage ? formatDistance(motorcycle.currentMileage) : "Not set"}
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedMotorcycle(motorcycle.id);
-                            setNewMileage(motorcycle.currentMileage?.toString() || "");
-                            setShowMileageModal(true);
-                          }}
-                          className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs md:text-sm hover:bg-gray-300"
-                        >
-                          Update
-                        </button>
-                        <Link
-                          href={`/garage/${motorcycle.id}`}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs md:text-sm hover:bg-blue-700"
-                        >
-                          Details
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {data.motorcycles.length === 0 && (
-              <div className="col-span-full text-center py-8 md:py-12">
-                <Bike size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-500 mb-4">No motorcycles in your garage yet</p>
-                <Link
-                  href="/garage/add"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center"
-                >
-                  <Plus size={16} className="mr-1" />
-                  Add Your First Motorcycle
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
       </main>
     </ClientLayout>
   );

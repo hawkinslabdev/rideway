@@ -64,47 +64,57 @@ export default function AddMotorcycle() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  // app/garage/add/page.tsx
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      // Convert the displayed mileage (in user's preferred units) to storage units (km)
-      const displayMileage = DistanceUtil.parseInput(formData.currentMileage);
-      const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
+  try {
+    // Convert the displayed mileage (in user's preferred units) to storage units (km)
+    const displayMileage = DistanceUtil.parseInput(formData.currentMileage);
+    const storageMileage = DistanceUtil.toStorageUnits(displayMileage, settings.units);
 
-      // Prepare JSON payload
-      const submitData = {
-        ...formData,
-        currentMileage: storageMileage !== null ? storageMileage : undefined,
-      };
-
-      const response = await fetch("/api/motorcycles", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(submitData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add motorcycle");
-      }
-
-      const newMotorcycle = await response.json();
-
-      if (isInitialSetup) {
-        router.push('/?welcome=true');
-      } else {
-        router.push('/garage');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add motorcycle. Please try again.");
-    } finally {
-      setLoading(false);
+    // Create FormData to handle file upload
+    const submitData = new FormData();
+    
+    // Add all form fields
+    Object.entries(formData).forEach(([key, value]) => {
+      submitData.append(key, value.toString());
+    });
+    
+    // Override mileage with converted value
+    if (storageMileage !== null) {
+      submitData.append('currentMileage', storageMileage.toString());
     }
-  };
+    
+    // Add image file if present
+    if (imageFile) {
+      submitData.append('image', imageFile);
+    }
+
+    const response = await fetch("/api/motorcycles", {
+      method: "POST",
+      body: submitData, // Send as FormData, not JSON
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to add motorcycle");
+    }
+
+    const newMotorcycle = await response.json();
+
+    if (isInitialSetup) {
+      router.push('/?welcome=true');
+    } else {
+      router.push('/garage');
+    }
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Failed to add motorcycle. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ClientLayout>
