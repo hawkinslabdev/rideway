@@ -28,27 +28,29 @@ interface MaintenanceTaskProps {
   compact?: boolean;
 }
 
-const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = false }) => {
+  const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = false }) => {
   const { formatDistance } = useSettings();
-  
-  // Determine the card style based on priority and due status
+
   const getCardStyle = () => {
     if (task.isDue) {
       return "border-red-300 bg-red-50";
     }
     
-    if (task.priority === "high") {
-      return "border-yellow-300 bg-yellow-50";
+    // For non-overdue tasks, check progress percentage
+    if (task.completionPercentage !== null) {
+      if (task.completionPercentage >= 90) {
+        return "border-yellow-300 bg-yellow-50";
+      } else if (task.completionPercentage >= 75) {
+        return "border-yellow-100 bg-yellow-50/50";
+      }
     }
     
-    if (task.priority === "medium") {
+    if (task.priority === "high") {
       return "border-blue-300 bg-blue-50";
     }
     
     return "border-gray-200";
   };
-
-  // File: app/components/MaintenanceTaskCard.tsx (continued)
 
   // Function to format the absolute due information
   const getAbsoluteDueInfo = () => {
@@ -203,12 +205,18 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
       {(task.completionPercentage !== null && task.completionPercentage >= 0) && (
         <div className="mb-3">
           <div className="flex justify-between text-xs mb-1">
-            <span>Progress toward next service</span>
-            <span>{Math.floor(task.completionPercentage)}%</span>
+            <span className="flex items-center">
+              <Gauge size={12} className="mr-1 text-gray-500" />
+              Progress toward next service
+            </span>
+            <span className="font-medium">
+              {Math.floor(task.completionPercentage)}%
+            </span>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-3 bg-gray-200 rounded-full overflow-hidden relative">
+            {/* Progress bar */}
             <div 
-              className={`h-full ${
+              className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${
                 task.isDue ? 'bg-red-500' : 
                 task.completionPercentage >= 90 ? 'bg-red-500' :
                 task.completionPercentage >= 75 ? 'bg-yellow-500' :
@@ -216,7 +224,22 @@ const MaintenanceTaskCard: React.FC<MaintenanceTaskProps> = ({ task, compact = f
               }`}
               style={{ width: `${Math.min(100, task.completionPercentage)}%` }}
             ></div>
+            
+            {/* Thresholds markers */}
+            <div className="absolute top-0 bottom-0 left-3/4 w-px bg-gray-400/50"></div>
+            <div className="absolute top-0 bottom-0 left-9/12 w-px bg-gray-400/50"></div>
           </div>
+          
+          {/* Duration estimate */}
+          {task.remainingMiles !== null && task.remainingMiles > 0 && (
+            <div className="mt-1 text-xs text-blue-600">
+              <span className="flex items-center">
+                <Clock size={12} className="mr-1" />
+                Approximately {Math.floor(task.remainingMiles / 20)} day{Math.floor(task.remainingMiles / 20) !== 1 ? 's' : ''} remaining
+                <span className="ml-1 text-gray-500">(at 20 miles/day)</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
       

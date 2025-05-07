@@ -20,6 +20,7 @@ import {
 import { format } from "date-fns";
 import ClientLayout from "@/app/components/ClientLayout";
 import { useSettings } from "@/app/contexts/SettingsContext";
+import MaintenanceTimeline from "../../components/MaintenanceTimeline";
 
 interface Motorcycle {
   id: string;
@@ -38,6 +39,7 @@ interface Motorcycle {
 }
 
 interface MaintenanceTask {
+  isDue: any;
   id: string;
   name: string;
   description: string | null;
@@ -527,67 +529,90 @@ export default function MotorcycleDetail() {
               </div>
               
               {maintenanceSchedule && maintenanceSchedule.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {maintenanceSchedule.map((task) => (
-                    <div key={task.id} className="border rounded-lg p-4 hover:shadow-md transition">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{task.name}</h4>
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            task.priority === "high"
-                              ? "bg-red-100 text-red-800"
-                              : task.priority === "medium"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-green-100 text-green-800"
-                          }`}
-                        >
-                          {task.priority}
-                        </span>
-                      </div>
-                      
-                      {task.description && (
-                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                      )}
-                      
-                      <div className="text-sm text-gray-600 space-y-1 mb-3">
-                        {task.dueDate && (
-                          <div className="flex items-center">
-                            <Calendar size={14} className="mr-1" />
-                            Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
+                <div className="space-y-6">
+                  {/* Visual timeline component */}
+                  <MaintenanceTimeline 
+                    motorcycleId={motorcycle.id}
+                    tasks={maintenanceSchedule.map(task => ({
+                      id: task.id,
+                      task: task.name,
+                      description: task.description,
+                      dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+                      dueMileage: task.dueMileage,
+                      priority: task.priority,
+                      isDue: task.isDue,
+                      currentMileage: motorcycle.currentMileage
+                    }))}
+                    currentMileage={motorcycle.currentMileage}
+                    milesPerDay={30} // You can adjust this or make it a user setting
+                  />
+                  
+                  {/* Original task cards */}
+                  <div className="mt-6 border-t pt-6">
+                    <h3 className="text-md font-medium mb-3">All Maintenance Tasks</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {maintenanceSchedule.map((task) => (
+                        <div key={task.id} className="border rounded-lg p-4 hover:shadow-md transition">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">{task.name}</h4>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                task.priority === "high"
+                                  ? "bg-red-100 text-red-800"
+                                  : task.priority === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {task.priority}
+                            </span>
                           </div>
-                        )}
-                        {task.dueMileage && (
-                          <div className="flex items-center">
-                            <Wrench size={14} className="mr-1" />
-                            Or at: {formatDistance(task.dueMileage)}
+                          
+                          {task.description && (
+                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                          )}
+                          
+                          <div className="text-sm text-gray-600 space-y-1 mb-3">
+                            {task.dueDate && (
+                              <div className="flex items-center">
+                                <Calendar size={14} className="mr-1" />
+                                Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
+                              </div>
+                            )}
+                            {task.dueMileage && (
+                              <div className="flex items-center">
+                                <Wrench size={14} className="mr-1" />
+                                Or at: {formatDistance(task.dueMileage)}
+                              </div>
+                            )}
+                            
+                            {task.lastCompleted && (
+                              <div className="flex items-center text-xs text-gray-500 mt-2">
+                                <Clock size={12} className="mr-1" />
+                                Last done: {format(new Date(task.lastCompleted), "MMM d, yyyy")}
+                                {task.lastMileage && ` at ${formatDistance(task.lastMileage)}`}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        
-                        {task.lastCompleted && (
-                          <div className="flex items-center text-xs text-gray-500 mt-2">
-                            <Clock size={12} className="mr-1" />
-                            Last done: {format(new Date(task.lastCompleted), "MMM d, yyyy")}
-                            {task.lastMileage && ` at ${formatDistance(task.lastMileage)}`}
+                          
+                          <div className="flex space-x-2">
+                            <Link 
+                              href={`/maintenance/${task.id}/complete`}
+                              className="flex-1 text-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                            >
+                              Mark Complete
+                            </Link>
+                            <Link
+                              href={`/maintenance/${task.id}/edit`}
+                              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                            >
+                              Edit
+                            </Link>
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex space-x-2">
-                        <Link 
-                          href={`/maintenance/${task.id}/complete`}
-                          className="flex-1 text-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                        >
-                          Mark Complete
-                        </Link>
-                        <Link
-                          href={`/maintenance/${task.id}/edit`}
-                          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                        >
-                          Edit
-                        </Link>
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-gray-50 rounded-lg p-8 text-center">

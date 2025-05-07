@@ -30,6 +30,7 @@ export default function AddMaintenancePage() {
   const [selectedMotorcycle, setSelectedMotorcycle] = useState<Motorcycle | null>(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [intervalBase, setIntervalBase] = useState<'current' | 'zero'>('current');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   
   // Track the type of mileage entry
   const [mileageType, setMileageType] = useState<'interval' | 'absolute'>('interval');
@@ -326,58 +327,103 @@ export default function AddMaintenancePage() {
                   />
                 </div>
                 
-                {/* Mileage Tracking Options */}
+                {/* Mileage Tracking Options - Simplified */}
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                  <div className="flex items-start mb-4">
-                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                      Mileage Tracking
-                      <button 
-                        type="button" 
-                        onClick={() => setShowInfoModal(true)}
-                        className="ml-1 text-blue-500 hover:text-blue-700"
-                      >
-                        <Info size={16} />
-                      </button>
-                    </h3>
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-700">When does this maintenance need to be done?</h3>
+                    <button 
+                      type="button" 
+                      className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center"
+                      onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                    >
+                      {showAdvancedOptions ? "Hide advanced options" : "Show advanced options"}
+                    </button>
                   </div>
                   
                   <div className="space-y-4">
-                    {/* Tracking type toggle */}
-                    <div className="flex gap-4">
-                      <div className="flex items-center">
-                        <input
-                          id="interval-tracking"
-                          name="mileage-tracking-type"
-                          type="radio"
-                          checked={mileageType === 'interval'}
-                          onChange={() => handleMileageTypeChange('interval')}
-                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <label htmlFor="interval-tracking" className="ml-2 block text-sm font-medium text-gray-700">
-                          Interval Based
-                        </label>
+                    {/* Simple tracking radio buttons with visual indicators */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div 
+                        className={`border rounded-lg p-4 cursor-pointer transition ${
+                          mileageType === 'interval' 
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50' 
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        onClick={() => handleMileageTypeChange('interval')}
+                      >
+                        <div className="flex items-start mb-2">
+                          <input
+                            id="interval-tracking"
+                            name="mileage-tracking-type"
+                            type="radio"
+                            checked={mileageType === 'interval'}
+                            onChange={() => handleMileageTypeChange('interval')}
+                            className="h-4 w-4 mt-1 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <label htmlFor="interval-tracking" className="ml-2 block font-medium text-gray-700">
+                            Regular Intervals
+                            <p className="font-normal text-xs text-gray-500 mt-1">
+                              Maintenance repeats after a certain distance or time
+                            </p>
+                          </label>
+                        </div>
+                        
+                        <div className="ml-6 mt-3">
+                          <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="absolute h-full bg-blue-500 rounded-full" style={{ width: '50%' }}></div>
+                            <div className="absolute h-full bg-blue-500 rounded-full" style={{ left: '75%', width: '50%' }}></div>
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Current</span>
+                            <span>+{selectedMotorcycle?.currentMileage ? formatDistance(3000) : "3000 miles"}</span>
+                            <span>+{selectedMotorcycle?.currentMileage ? formatDistance(6000) : "6000 miles"}</span>
+                          </div>
+                        </div>
                       </div>
                       
-                      <div className="flex items-center">
-                        <input
-                          id="absolute-tracking"
-                          name="mileage-tracking-type"
-                          type="radio"
-                          checked={mileageType === 'absolute'}
-                          onChange={() => handleMileageTypeChange('absolute')}
-                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <label htmlFor="absolute-tracking" className="ml-2 block text-sm font-medium text-gray-700">
-                          Absolute Value
-                        </label>
+                      <div 
+                        className={`border rounded-lg p-4 cursor-pointer transition ${
+                          mileageType === 'absolute' 
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50' 
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        onClick={() => handleMileageTypeChange('absolute')}
+                      >
+                        <div className="flex items-start mb-2">
+                          <input
+                            id="absolute-tracking"
+                            name="mileage-tracking-type"
+                            type="radio"
+                            checked={mileageType === 'absolute'}
+                            onChange={() => handleMileageTypeChange('absolute')}
+                            className="h-4 w-4 mt-1 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <label htmlFor="absolute-tracking" className="ml-2 block font-medium text-gray-700">
+                            Specific Milestone
+                            <p className="font-normal text-xs text-gray-500 mt-1">
+                              Maintenance due at exact odometer reading
+                            </p>
+                          </label>
+                        </div>
+                        
+                        <div className="ml-6 mt-3">
+                          <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="absolute h-full w-4 bg-blue-500" style={{ left: '80%' }}></div>
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0</span>
+                            <span>{selectedMotorcycle?.currentMileage ? formatDistance(selectedMotorcycle.currentMileage) : "Current"}</span>
+                            <span>Target: {selectedMotorcycle?.currentMileage ? formatDistance(10000) : "10000 miles"}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     
-                    {/* Mileage input based on selected type */}
-                    {mileageType === 'interval' ? (
-                      <div>
+                    {/* Input fields based on selected type */}
+                    {mileageType === 'interval' && (
+                      <div className="mt-4">
                         <label htmlFor="intervalMiles" className="block text-sm font-medium text-gray-700">
-                          Mileage Interval (Every X {unitLabel})
+                          Perform this maintenance every:
                         </label>
                         <div className="mt-1 flex rounded-md shadow-sm">
                           <input
@@ -388,70 +434,76 @@ export default function AddMaintenancePage() {
                             value={formData.intervalMiles}
                             onChange={handleChange}
                             className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder={`e.g., 3000 ${unitLabel}`}
+                            placeholder="3000"
                           />
                           <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
                             {unitLabel}
                           </span>
                         </div>
                         
-                        {/* Add the interval base selector */}
-                        <div className="mt-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Interval Calculation Base
-                          </label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center">
-                              <input
-                                id="current-based"
-                                type="radio"
-                                name="intervalBase"
-                                checked={intervalBase === 'current'}
-                                onChange={() => setIntervalBase('current')}
-                                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                              />
-                              <label htmlFor="current-based" className="ml-2 block text-sm text-gray-700">
-                                From Current Mileage
-                              </label>
-                            </div>
-                            <div className="flex items-center">
-                              <input
-                                id="zero-based"
-                                type="radio"
-                                name="intervalBase"
-                                checked={intervalBase === 'zero'}
-                                onChange={() => setIntervalBase('zero')}
-                                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                              />
-                              <label htmlFor="zero-based" className="ml-2 block text-sm text-gray-700">
-                                From Zero (Absolute Intervals)
-                              </label>
-                            </div>
+                        {formData.intervalMiles && selectedMotorcycle?.currentMileage && (
+                          <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                            Next service will be due at approximately: {formatDistance(parseInt(formData.intervalMiles) + selectedMotorcycle.currentMileage)}
                           </div>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Choose whether intervals count from the current mileage or are aligned to fixed values from zero.
-                          </p>
-                          
-                          {/* Example calculation based on the selected interval base */}
-                          {formData.intervalMiles && selectedMotorcycle?.currentMileage && (
-                            <div className="mt-2 bg-blue-50 p-2 rounded text-xs text-blue-600">
+                        )}
+                        
+                        {/* Advanced options - hidden by default */}
+                        {showAdvancedOptions && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Advanced: Interval Calculation Method
+                            </label>
+                            <div className="flex gap-4">
+                              <div className="flex items-center">
+                                <input
+                                  id="current-based"
+                                  type="radio"
+                                  name="intervalBase"
+                                  checked={intervalBase === 'current'}
+                                  onChange={() => setIntervalBase('current')}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                />
+                                <label htmlFor="current-based" className="ml-2 block text-sm text-gray-700">
+                                  From Current Mileage
+                                </label>
+                              </div>
+                              <div className="flex items-center">
+                                <input
+                                  id="zero-based"
+                                  type="radio"
+                                  name="intervalBase"
+                                  checked={intervalBase === 'zero'}
+                                  onChange={() => setIntervalBase('zero')}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                />
+                                <label htmlFor="zero-based" className="ml-2 block text-sm text-gray-700">
+                                  From Zero (Fixed Intervals)
+                                </label>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2 p-2 rounded bg-gray-50 text-xs text-gray-600">
                               {intervalBase === 'current' ? (
-                                <span>
-                                  Next service due at: {formatDistance(parseInt(formData.intervalMiles) + selectedMotorcycle.currentMileage)}
-                                </span>
+                                <>
+                                  <p className="mb-1"><strong>From Current Mileage:</strong> Counts forward from your current odometer reading.</p>
+                                  <p>Example: If current mileage is 5,000 and interval is 3,000, next service due at 8,000.</p>
+                                </>
                               ) : (
-                                <span>
-                                  Next service due at: {formatDistance(Math.ceil(selectedMotorcycle.currentMileage / parseInt(formData.intervalMiles)) * parseInt(formData.intervalMiles))}
-                                </span>
+                                <>
+                                  <p className="mb-1"><strong>From Zero:</strong> Aligns to fixed intervals regardless of current mileage.</p>
+                                  <p>Example: If interval is 3,000, services will be at 3,000, 6,000, 9,000, etc.</p>
+                                </>
                               )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div>
+                    )}
+                    
+                    {mileageType === 'absolute' && (
+                      <div className="mt-4">
                         <label htmlFor="nextDueMileage" className="block text-sm font-medium text-gray-700">
-                          Due At Specific Odometer Reading
+                          Due at exactly:
                         </label>
                         <div className="mt-1 flex rounded-md shadow-sm">
                           <input
@@ -462,48 +514,29 @@ export default function AddMaintenancePage() {
                             value={formData.nextDueMileage}
                             onChange={handleChange}
                             className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder={`e.g., 10000 ${unitLabel}`}
+                            placeholder="10000"
                           />
                           <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
                             {unitLabel}
                           </span>
                         </div>
-                        {selectedMotorcycle && selectedMotorcycle.currentMileage !== null && formData.nextDueMileage && (
-                          <p className="mt-1 text-xs text-gray-600">
-                            {parseInt(formData.nextDueMileage) > selectedMotorcycle.currentMileage ? (
-                              `That's ${parseInt(formData.nextDueMileage) - selectedMotorcycle.currentMileage} ${unitLabel} from now`
+                        
+                        {selectedMotorcycle?.currentMileage !== null && formData.nextDueMileage && (
+                          <div className="mt-2 bg-blue-50 p-2 rounded text-xs">
+                            {selectedMotorcycle && parseInt(formData.nextDueMileage) > selectedMotorcycle.currentMileage ? (
+                              <span className="text-blue-600">
+                                That's {formatDistance(parseInt(formData.nextDueMileage) - selectedMotorcycle.currentMileage)} from your current odometer reading
+                              </span>
                             ) : (
-                              <span className="text-red-600">Value must be greater than current mileage</span>
+                              <span className="text-red-600">
+                                Value must be greater than current mileage ({selectedMotorcycle ? formatDistance(selectedMotorcycle.currentMileage) : "unknown"})
+                              </span>
                             )}
-                          </p>
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="intervalDays" className="block text-sm font-medium text-gray-700">
-                    Time Interval (Optional)
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="number"
-                      name="intervalDays"
-                      id="intervalDays"
-                      min="1"
-                      value={formData.intervalDays}
-                      onChange={handleChange}
-                      className="flex-grow block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholder="e.g., 180"
-                    />
-                    <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                      days
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    How often this task needs to be done based on time
-                  </p>
                 </div>
                 
                 <div>
