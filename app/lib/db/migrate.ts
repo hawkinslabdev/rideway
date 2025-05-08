@@ -224,6 +224,15 @@ async function updateMaintenanceTasks() {
     const allTasks = await db.query.maintenanceTasks.findMany();
     console.log(`Found ${allTasks.length} maintenance tasks`);
 
+    // Get all maintenance records for reference
+    const allRecords = await db.query.maintenanceRecords.findMany({
+      orderBy: (records, { desc }) => [desc(records.date)]
+    });
+    
+    // Current date for due date calculations
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     // Process each task to add new fields
     let updatedCount = 0;
     for (const task of allTasks) {
@@ -239,16 +248,60 @@ async function updateMaintenanceTasks() {
       // Set interval base if not set
       const intervalBase = task.intervalBase || 'current';
       
+      // Find the last maintenance record for this task
+      const taskRecords = allRecords
+        .filter(r => r.taskId === task.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+      const lastRecord = taskRecords.length > 0 ? taskRecords[0] : null;
+      
       // Calculate next due values
       let nextDueOdometer = null;
-      if (task.intervalMiles && motorcycle.currentMileage !== null) {
-        if (intervalBase === 'current') {
-          // Current-based: Add interval to current mileage
-          nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
-        } else {
-          // Zero-based: find next interval from zero
-          const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
-          nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+      let nextDueDate = null;
+      
+      if (lastRecord) {
+        // If we have a last record, calculate based on that
+        
+        // If task has a mileage interval and last record has mileage, calculate from last record
+        if (task.intervalMiles && lastRecord.mileage) {
+          nextDueOdometer = lastRecord.mileage + task.intervalMiles;
+        } 
+        // If no last record mileage but there is current mileage, use current
+        else if (task.intervalMiles && motorcycle.currentMileage !== null) {
+          if (intervalBase === 'current') {
+            nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
+          } else {
+            // Zero-based: find next interval from zero
+            const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+            nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+          }
+        }
+        
+        // If task has day interval, calculate next due date
+        if (task.intervalDays) {
+          nextDueDate = new Date(lastRecord.date);
+          nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+        }
+      } else {
+        // First time maintenance - calculate from current values
+        
+        // For mileage interval, use current motorcycle mileage
+        if (task.intervalMiles && motorcycle.currentMileage !== null) {
+          if (intervalBase === 'current') {
+            nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
+          } else {
+            // Zero-based: find next interval from zero
+            const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+            nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+          }
+        }
+        
+        // For day interval, use current date or purchase date
+        if (task.intervalDays) {
+          // For first maintenance with day interval, use motorcycle purchase date if available
+          const startDate = motorcycle.purchaseDate || new Date();
+          nextDueDate = new Date(startDate);
+          nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
         }
       }
       
@@ -258,7 +311,7 @@ async function updateMaintenanceTasks() {
           baseOdometer: motorcycle.currentMileage || 0,
           baseDate: new Date(),
           nextDueOdometer: nextDueOdometer,
-          nextDueDate: task.intervalDays ? addDays(new Date(), task.intervalDays) : null,
+          nextDueDate: nextDueDate,
           intervalBase: intervalBase,
           archived: task.archived || false
         })
@@ -266,6 +319,7 @@ async function updateMaintenanceTasks() {
       
       updatedCount++;
       console.log(`  - Task updated successfully with interval base: ${intervalBase}`);
+      console.log(`  - Next due: ${nextDueDate ? nextDueDate.toISOString() : 'None'}, ${nextDueOdometer || 'None'}`);
     }
 
     console.log(`Updated ${updatedCount} maintenance tasks with tracking fields`);

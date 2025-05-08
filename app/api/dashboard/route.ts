@@ -56,6 +56,9 @@ export async function GET() {
     let overdueCount = 0;
 
     for (const task of tasks) {
+      // Skip archived tasks
+      if (task.archived) continue;
+      
       // Find the motorcycle this task belongs to
       const motorcycle = userMotorcycles.find(m => m.id === task.motorcycleId);
       
@@ -134,6 +137,10 @@ export async function GET() {
 
     // Sort upcoming tasks by due date (null values last)
     const sortedTasks = upcomingTasks.sort((a, b) => {
+      // First, sort by due status
+      if (a.isDue && !b.isDue) return -1;
+      if (!a.isDue && b.isDue) return 1;
+      
       // If both have due dates, sort by date
       if (a.dueDate && b.dueDate) {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
@@ -157,7 +164,7 @@ export async function GET() {
     return NextResponse.json({
       motorcycles: userMotorcycles,
       upcomingMaintenance: sortedTasks.slice(0, 5), // Get top 5 upcoming tasks
-      overdueCount,
+      overdueCount
     });
   } catch (error) {
     console.error("Dashboard API error:", error);

@@ -63,7 +63,6 @@ export async function POST(
     }
     
     // Get maintenance mileage (default to current motorcycle mileage if not provided)
-    
     const maintenanceMileage = body.mileage || motorcycle.currentMileage;
     const maintenanceDate = new Date();
     

@@ -1,3 +1,4 @@
+// app/components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -8,7 +9,8 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bike, Home, Wrench, History, BarChart3, Settings,
   User, LogOut, Menu, X, ChevronDown, AlertCircle,
-  Plus, Gauge, Bell, Calendar
+  Plus, Gauge, Bell, Calendar,
+  ChevronRight
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import MileageUpdateModal from "./MileageUpdateModal"; // Create this component separately
@@ -75,7 +77,10 @@ export default function Sidebar() {
         if (response.ok) {
           const data = await response.json();
           
-          // Set the number of alerts
+          // Explicitly log the data to debug
+          console.log("Dashboard data:", data);
+          
+          // Set the number of alerts - make sure we're using the correct property
           setMaintenanceAlerts(data.overdueCount || 0);
           
           // Filter motorcycles with overdue maintenance
@@ -98,7 +103,7 @@ export default function Sidebar() {
     
     fetchAlertData();
   }, []);
-
+  
   const handleSignOut = async () => {
     await signOut({ redirect: false });
     router.push("/auth/signin");
@@ -173,22 +178,23 @@ export default function Sidebar() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mx-5 mb-4 grid grid-cols-2 gap-2">
+        <div className="mx-5 mb-4">
           <button
             onClick={() => setShowMileageModal(true)}
-            className="flex flex-col items-center justify-center bg-blue-800 rounded-lg p-3 hover:bg-blue-700 transition-colors"
+            className="w-full flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
           >
-            <Gauge size={18} className="mb-1 text-blue-300" />
-            <span className="text-xs">Update Mileage</span>
+            <div className="flex items-center">
+              <div className="bg-white/20 p-2 rounded-lg mr-3">
+                <Gauge size={18} className="text-white" />
+              </div>
+              <div>
+                <span className="font-small">Update Mileage</span>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-blue-300" />
           </button>
-          <Link
-            href="/maintenance/add"
-            className="flex flex-col items-center justify-center bg-blue-800 rounded-lg p-3 hover:bg-blue-700 transition-colors"
-          >
-            <Wrench size={18} className="mb-1 text-blue-300" />
-            <span className="text-xs">Log Maintenance</span>
-          </Link>
         </div>
+
 
         {/* Nav */}
         <div className="px-3">

@@ -153,13 +153,25 @@ export async function GET(request: Request) {
     const motorcycleIds = userMotorcycles.map(m => m.id);
     
     // Create the base query condition
-    let tasksWhere = inArray(maintenanceTasks.motorcycleId, motorcycleIds);
+    let tasksWhere: any;
+    
+    if (!includeArchived) {
+      // Only include non-archived tasks by default
+      tasksWhere = and(
+        inArray(maintenanceTasks.motorcycleId, motorcycleIds),
+        eq(maintenanceTasks.archived, false)
+      );
+    } else {
+      // Include all tasks when specifically requested
+      tasksWhere = inArray(maintenanceTasks.motorcycleId, motorcycleIds);
+    }
 
     // In case motorcycleIds is empty, provide a fallback condition
     if (motorcycleIds.length === 0) {
       // This will intentionally match no records, but provide a valid SQL condition
       tasksWhere = eq(maintenanceTasks.id, 'no-match-condition');
     }
+    
     // Get all maintenance tasks for all user's motorcycles
     const tasks = await db.query.maintenanceTasks.findMany({
       where: tasksWhere,
@@ -194,7 +206,7 @@ export async function GET(request: Request) {
       // Determine if the task is due based on the next due values
       const isDueByDate = task.nextDueDate && task.nextDueDate <= today;
       const isDueByMileage = task.nextDueOdometer && motorcycle.currentMileage && 
-                              task.nextDueOdometer <= motorcycle.currentMileage;
+                            task.nextDueOdometer <= motorcycle.currentMileage;
       const isDue = isDueByDate || isDueByMileage;
 
       // Calculate remaining values
@@ -209,7 +221,7 @@ export async function GET(request: Request) {
       
       // Calculate completion percentage based on mileage
       let completionPercentage = null;
-      if (task.intervalMiles && remainingMiles !== null) {
+      if (task.intervalMiles && remainingMiles !== null && task.intervalMiles > 0) {
         completionPercentage = 100 - (remainingMiles / task.intervalMiles * 100);
         // Cap at 100%
         if (completionPercentage > 100) {
@@ -268,10 +280,14 @@ export async function GET(request: Request) {
 
     // Sort tasks by priority, then by remaining miles/days
     validTasks.sort((a, b) => {
+      // Sort by due status first
+      if (a.isDue && !b.isDue) return -1;
+      if (!a.isDue && b.isDue) return 1;
+      
       // Sort by priority first
       const priorityOrder = { high: 0, medium: 1, low: 2 };
       const priorityDiff = priorityOrder[a.priority as keyof typeof priorityOrder] - 
-                            priorityOrder[b.priority as keyof typeof priorityOrder];
+                          priorityOrder[b.priority as keyof typeof priorityOrder];
       if (priorityDiff !== 0) {
         return priorityDiff;
       }
@@ -290,10 +306,13 @@ export async function GET(request: Request) {
       return a.task.localeCompare(b.task);
     });
 
+    // Count number of overdue tasks
+    const overdueCount = validTasks.filter(t => t.isDue).length;
+
     return NextResponse.json({ 
       tasks: validTasks,
       // Also include count of overdue tasks for quick dashboard indicators
-      overdueCount: validTasks.filter(t => t.isDue).length,
+      overdueCount,
       // Include count of archived tasks
       archivedCount: tasks.filter(t => t.archived).length
     });
