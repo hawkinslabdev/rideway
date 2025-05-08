@@ -359,15 +359,25 @@ function AddIntegrationModal({ templates, onClose, onSave }: AddIntegrationModal
     if (selectedTemplate) {
       const template = templates.find(t => t.id === selectedTemplate);
       if (template) {
-        setSelectedType(template.type);
-        setFormData(prev => ({
-          ...prev,
-          name: template.name,
-          config: template.defaultConfig
-        }));
+        if (selectedType !== template.type) {
+          setSelectedType(template.type);
+        }
+        setFormData(prev => {
+          if (
+            prev.name !== template.name ||
+            JSON.stringify(prev.config) !== JSON.stringify(template.defaultConfig)
+          ) {
+            return {
+              ...prev,
+              name: template.name,
+              config: template.defaultConfig
+            };
+          }
+          return prev;
+        });
       }
     }
-  }, [selectedTemplate, templates]);
+  }, [selectedTemplate, templates, selectedType]);
 
   const handleTypeSelect = (type: IntegrationType) => {
     setSelectedType(type);

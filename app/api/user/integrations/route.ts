@@ -79,8 +79,8 @@ export async function POST(request: Request) {
       type: body.type,
       active: body.active ?? true,
       config: encryptedConfig,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }).returning();
 
     // Define the type for event objects
