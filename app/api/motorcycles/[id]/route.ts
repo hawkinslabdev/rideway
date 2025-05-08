@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { db } from "@/app/lib/db/db";
+import { triggerEvent } from "@/app/lib/services/integrationService";
 import { motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "@/app/lib/db/schema";
+import { checkForNewlyDueTasks, updateMaintenanceTasksAfterMileageChange } from "@/app/lib/utils/maintenanceUtils";
 import { eq, and } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -328,7 +330,72 @@ export async function PATCH(
           });
           
           // Update maintenance tasks based on new mileage
-          await updateMaintenanceTasks(id, oldMileage, newMileage);
+          if (body.currentMileage !== undefined) {
+            const newMileage = parseInt(body.currentMileage);
+            const oldMileage = motorcycle.currentMileage;
+            
+            if (oldMileage !== newMileage) {
+              await db.insert(mileageLogs).values({
+                id: randomUUID(),
+                motorcycleId: id,
+                previousMileage: oldMileage,
+                newMileage: newMileage,
+                date: new Date(),
+                notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
+                createdAt: new Date()
+              });
+              
+              // Update maintenance tasks based on new mileage
+              await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
+              
+              // Check for tasks that became due with this update
+              const notificationsTriggered = await checkForNewlyDueTasks(
+                session.user.id,
+                id,
+                oldMileage,
+                newMileage
+              );
+              
+              if (notificationsTriggered > 0) {
+                console.log(`Triggered ${notificationsTriggered} maintenance notifications for motorcycle ${id}`);
+              }
+            }
+          }
+          
+          // NEW CODE: Check for tasks that became due
+          // Get all tasks for this motorcycle
+          const tasks = await db.query.maintenanceTasks.findMany({
+            where: and(
+              eq(maintenanceTasks.motorcycleId, id),
+              eq(maintenanceTasks.archived, false)
+            ),
+          });
+          
+          // Find tasks that became due with this mileage update
+          const newlyDueTasks = tasks.filter(task => {
+            // Check if the task has a mileage threshold and it's now due
+            return task.nextDueOdometer !== null && 
+                   task.nextDueOdometer <= newMileage &&
+                   (oldMileage === null || task.nextDueOdometer > oldMileage);
+          });
+          
+          // Trigger maintenance_due event for each task that just became due
+          for (const task of newlyDueTasks) {
+            await triggerEvent(session.user.id, "maintenance_due", {
+              motorcycle: {
+                id: motorcycle.id,
+                name: motorcycle.name,
+                make: motorcycle.make,
+                model: motorcycle.model,
+                year: motorcycle.year
+              },
+              task: {
+                id: task.id,
+                name: task.name
+              }
+            });
+            console.log(`Triggered maintenance_due event for task: ${task.name}`);
+          }
         }
       }
     }

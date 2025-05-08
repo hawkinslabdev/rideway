@@ -825,6 +825,112 @@ async function setupDefaultIntegrationTemplates() {
   }
 }
 
+async function ensureMaintenanceScheduling() {
+  console.log("Ensuring maintenance task schedules are correctly set...");
+  
+  try {
+    // Find any tasks that have inconsistent scheduling data
+    const tasks = await db.query.maintenanceTasks.findMany({
+      where: and(
+        // Where either baseOdometer or baseDate is null
+        or(
+          isNull(maintenanceTasks.baseOdometer),
+          isNull(maintenanceTasks.baseDate)
+        ),
+        // Only fix non-archived tasks
+        eq(maintenanceTasks.archived, false)
+      )
+    });
+    
+    console.log(`Found ${tasks.length} tasks with inconsistent scheduling data`);
+    
+    // Process each task to fix its scheduling
+    for (const task of tasks) {
+      // Get the associated motorcycle
+      const motorcycle = await db.query.motorcycles.findFirst({
+        where: eq(motorcycles.id, task.motorcycleId)
+      });
+      
+      if (!motorcycle) {
+        console.log(`  - Skipping task ${task.id} - motorcycle not found`);
+        continue;
+      }
+      
+      // Current date for calculations
+      const now = new Date();
+      
+      // Get the last maintenance record for this task
+      const lastRecord = await db.query.maintenanceRecords.findFirst({
+        where: eq(maintenanceRecords.taskId, task.id),
+        orderBy: (records, { desc }) => [desc(records.date)]
+      });
+      
+      // Calculate next due values
+      let nextDueOdometer = null;
+      let nextDueDate = null;
+      
+      // Set interval base if not set
+      const intervalBase = task.intervalBase || 'current';
+      
+      if (lastRecord) {
+        // Calculate based on last maintenance record
+        if (task.intervalMiles && lastRecord.mileage !== null) {
+          nextDueOdometer = lastRecord.mileage + task.intervalMiles;
+        } else if (task.intervalMiles && motorcycle.currentMileage !== null) {
+          // No mileage in record, use current motorcycle mileage
+          if (intervalBase === 'zero') {
+            const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+            nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+          } else {
+            nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
+          }
+        }
+        
+        // Calculate time-based due date
+        if (task.intervalDays) {
+          nextDueDate = new Date(lastRecord.date);
+          nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+        }
+      } else {
+        // No previous record, calculate from current data
+        if (task.intervalMiles && motorcycle.currentMileage !== null) {
+          if (intervalBase === 'zero') {
+            const intervalsPassed = Math.floor(motorcycle.currentMileage / task.intervalMiles);
+            nextDueOdometer = (intervalsPassed + 1) * task.intervalMiles;
+          } else {
+            nextDueOdometer = motorcycle.currentMileage + task.intervalMiles;
+          }
+        }
+        
+        // For day interval, use motorcycle purchase date or current date
+        if (task.intervalDays) {
+          const startDate = motorcycle.purchaseDate || now;
+          nextDueDate = new Date(startDate);
+          nextDueDate.setDate(nextDueDate.getDate() + task.intervalDays);
+        }
+      }
+      
+      // Update the task with fixed scheduling data
+      await db.update(maintenanceTasks)
+        .set({
+          baseOdometer: motorcycle.currentMileage || 0,
+          baseDate: now,
+          nextDueOdometer: nextDueOdometer,
+          nextDueDate: nextDueDate,
+          intervalBase: intervalBase
+        })
+        .where(eq(maintenanceTasks.id, task.id));
+      
+      console.log(`  - Fixed scheduling for task ${task.id} (${task.name})`);
+    }
+    
+    console.log("Maintenance scheduling consistency check completed");
+  } catch (error) {
+    console.error("Error ensuring maintenance scheduling:", error);
+    throw error;
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   await db.run(sql`
@@ -837,6 +943,7 @@ async function runMigrations() {
     await setupExistingData();
     await backfillMileageLogs();
     await ensureMaintenanceActivity();
+    await ensureMaintenanceScheduling();
     await cleanupDuplicateMileageLogs();
     await ensurePasswordResetTable();
     await ensureIntegrationsTable();

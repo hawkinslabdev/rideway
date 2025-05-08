@@ -1,8 +1,9 @@
 // app/api/motorcycles/mileage-log/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
-import { motorcycles, mileageLogs } from "@/app/lib/db/schema";
+import { motorcycles, mileageLogs, maintenanceTasks } from "@/app/lib/db/schema";
 import { triggerEvent } from "@/app/lib/services/integrationService";
+import { checkForNewlyDueTasks } from "@/app/lib/utils/maintenanceUtils";
 import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
       .where(eq(motorcycles.id, motorcycleId));
 
     // Trigger an event for the mileage update
+    // Trigger an event for the mileage update
     await triggerEvent(session.user.id, "mileage_updated", {
       motorcycle: {
         id: motorcycle.id,
@@ -82,7 +84,50 @@ export async function POST(request: Request) {
       },
       previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
       newMileage: newMileage
-    });    
+    });
+    
+    // NEW CODE: Check for maintenance tasks that have become due after this mileage update
+    // Get all tasks for this motorcycle
+    const tasks = await db.query.maintenanceTasks.findMany({
+      where: and(
+        eq(maintenanceTasks.motorcycleId, motorcycleId),
+        eq(maintenanceTasks.archived, false)
+      ),
+    });
+    
+    // Find tasks that became due with this mileage update
+    const newlyDueTasks = tasks.filter(task => {
+      // Check if the task has a mileage threshold and it's now due
+      return task.nextDueOdometer !== null && 
+             task.nextDueOdometer <= newMileage &&
+             (previousMileage === null || task.nextDueOdometer > previousMileage);
+    });
+    
+    // Trigger maintenance_due event for each task that just became due
+    for (const task of newlyDueTasks) {
+      await triggerEvent(session.user.id, "maintenance_due", {
+        motorcycle: {
+          id: motorcycle.id,
+          name: motorcycle.name,
+          make: motorcycle.make,
+          model: motorcycle.model,
+          year: motorcycle.year
+        },
+        task: {
+          id: task.id,
+          name: task.name
+        }
+      });
+      console.log(`Triggered maintenance_due event for task: ${task.name}`);
+    }
+    
+    // Check for maintenance tasks that have become due after this mileage update
+    await checkForNewlyDueTasks(
+      session.user.id,
+      motorcycleId,
+      previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
+      newMileage
+    );
 
     return NextResponse.json(logEntry[0], { status: 201 });
   } catch (error) {
