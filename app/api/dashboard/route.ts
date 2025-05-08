@@ -64,47 +64,11 @@ export async function GET() {
       
       if (!motorcycle) continue; // Skip if motorcycle not found
 
-      // Get all maintenance records for this task, sorted by most recent first
-      const taskRecords = records
-        .filter(r => r.taskId === task.id)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      // Get the most recent maintenance record
-      const lastRecord = taskRecords.length > 0 ? taskRecords[0] : null;
-      
-      let dueDate: Date | null = null;
-      let dueMileage: number | null = null;
-
-      // Calculate next due date/mileage based on intervals and last record
-      if (lastRecord) {
-        // If task has a day interval, calculate the next due date
-        if (task.intervalDays) {
-          dueDate = new Date(lastRecord.date);
-          dueDate.setDate(dueDate.getDate() + task.intervalDays);
-        }
-        
-        // If task has a mileage interval and last record has mileage, calculate next due mileage
-        if (task.intervalMiles && lastRecord.mileage) {
-          dueMileage = lastRecord.mileage + task.intervalMiles;
-        }
-      } else {
-        // First time maintenance - calculate from current values
-        if (task.intervalDays) {
-          // For first maintenance with day interval, use motorcycle purchase date if available, otherwise use today
-          const startDate = motorcycle.purchaseDate || new Date();
-          dueDate = new Date(startDate);
-          dueDate.setDate(dueDate.getDate() + task.intervalDays);
-        }
-        
-        // For first maintenance with mileage interval, use current mileage as baseline
-        if (task.intervalMiles && motorcycle.currentMileage) {
-          dueMileage = motorcycle.currentMileage + task.intervalMiles;
-        }
-      }
-
-      // Determine if the task is due based on either date or mileage
-      const isDueByDate = dueDate && dueDate <= today;
-      const isDueByMileage = dueMileage && motorcycle.currentMileage && dueMileage <= motorcycle.currentMileage;
+      // FIXED: Use the task's stored nextDueDate and nextDueOdometer directly
+      // This ensures consistency with the maintenance API
+      const isDueByDate = task.nextDueDate && task.nextDueDate <= today;
+      const isDueByMileage = task.nextDueOdometer && motorcycle.currentMileage && 
+                            task.nextDueOdometer <= motorcycle.currentMileage;
       const isDue = isDueByDate || isDueByMileage;
 
       // Increment overdue count if task is due
@@ -113,7 +77,7 @@ export async function GET() {
       }
 
       // Only include tasks that have a due date or mileage
-      if (dueDate || dueMileage) {
+      if (task.nextDueDate || task.nextDueOdometer) {
         // Set priority based on due status
         let priority = task.priority || "medium";
         if (isDue) {
@@ -126,8 +90,8 @@ export async function GET() {
           motorcycleId: motorcycle.id,
           task: task.name,
           description: task.description,
-          dueDate: dueDate?.toISOString() || null,
-          dueMileage,
+          dueDate: task.nextDueDate?.toISOString() || null,
+          dueMileage: task.nextDueOdometer,
           priority,
           isDue,
           currentMileage: motorcycle.currentMileage

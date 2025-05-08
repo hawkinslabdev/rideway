@@ -245,13 +245,6 @@ export default function Sidebar() {
                   <Calendar size={14} className="text-red-300" />
                 </Link>
               ))}
-              
-              <Link 
-                href="/maintenance" 
-                className="mt-1 text-center block w-full text-xs text-red-300 hover:text-red-200 py-1"
-              >
-                View all overdue tasks
-              </Link>
             </div>
           </div>
         )}

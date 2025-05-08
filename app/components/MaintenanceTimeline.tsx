@@ -12,8 +12,9 @@ import {
   isToday,
   eachDayOfInterval
 } from 'date-fns';
-import { Calendar, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { Calendar, AlertCircle, Clock, Wrench, Gauge } from 'lucide-react';
 import Link from 'next/link';
+import { DistanceUtil } from '../lib/utils/distance';
 
 interface MaintenanceTask {
   id: string;
@@ -35,7 +36,7 @@ interface MaintenanceTimelineProps {
 }
 
 export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileage, milesPerDay = 20 }: MaintenanceTimelineProps) {
-  const { formatDistance } = useSettings();
+  const { formatDistance, settings } = useSettings();
   const [viewMode, setViewMode] = React.useState<'timeline' | 'calendar'>('timeline');
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   
@@ -46,10 +47,10 @@ export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileag
     
     // If task has a mileage trigger but no date trigger, estimate the date
     if (!processedTask.dueDate && processedTask.dueMileage && currentMileage) {
-      const milesRemaining = processedTask.dueMileage - currentMileage;
-      if (milesRemaining > 0) {
-        // Estimate days until due based on average miles per day
-        const daysUntilDue = Math.ceil(milesRemaining / milesPerDay);
+      // Use our enhanced DistanceUtil for time calculation
+      const daysUntilDue = DistanceUtil.daysUntilMileage(currentMileage, processedTask.dueMileage, milesPerDay);
+      
+      if (daysUntilDue !== null && daysUntilDue > 0) {
         const estimatedDueDate = addDays(new Date(), daysUntilDue);
         processedTask.estimatedDueDate = estimatedDueDate.toISOString();
       }
@@ -72,6 +73,33 @@ export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileag
     
     return aDate.getTime() - bDate.getTime();
   });
+  
+  // Calculate mileage remaining, with improved formatting
+  const getMileageRemaining = (task: MaintenanceTask) => {
+    if (currentMileage === null || task.dueMileage === null) return null;
+    
+    const remaining = task.dueMileage - currentMileage;
+    if (remaining <= 0) return 'Due now';
+    
+    return `${formatDistance(remaining)} remaining`;
+  };
+  
+  // Format the estimated time in a more human-readable way
+  const formatEstimatedTimeRemaining = (task: MaintenanceTask) => {
+    if (currentMileage === null || task.dueMileage === null) return null;
+    
+    const daysRemaining = DistanceUtil.daysUntilMileage(currentMileage, task.dueMileage, milesPerDay);
+    if (daysRemaining === null) return null;
+    if (daysRemaining === 0) return 'Due now';
+    
+    if (daysRemaining < 7) return `Due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`;
+    
+    const weeksRemaining = Math.floor(daysRemaining / 7);
+    if (weeksRemaining < 4) return `Due in ${weeksRemaining} week${weeksRemaining === 1 ? '' : 's'}`;
+    
+    const monthsRemaining = Math.floor(daysRemaining / 30);
+    return `Due in ${monthsRemaining} month${monthsRemaining === 1 ? '' : 's'}`;
+  };
   
   // Generate dots for calendar view
   const getDotColorForDate = (date: Date) => {
@@ -132,7 +160,7 @@ export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileag
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-lg font-semibold">Maintenance Schedule</h2>
+        <h2 className="text-lg font-semibold"></h2>
         <div className="flex space-x-2">
           <button 
             onClick={() => setViewMode('timeline')}
@@ -224,8 +252,16 @@ export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileag
                                     
                                     {task.dueMileage && (
                                       <span className="flex items-center">
-                                        <Wrench size={12} className="mr-1" />
+                                        <Gauge size={12} className="mr-1" />
                                         At: {formatDistance(task.dueMileage)}
+                                      </span>
+                                    )}
+                                    
+                                    {/* Add estimated time remaining for mileage-based tasks */}
+                                    {!task.isDue && !task.dueDate && task.dueMileage && currentMileage && (
+                                      <span className="flex items-center">
+                                        <Wrench size={12} className="mr-1" />
+                                        {formatEstimatedTimeRemaining(task)}
                                       </span>
                                     )}
                                   </div>
@@ -323,21 +359,40 @@ export default function MaintenanceTimeline({ motorcycleId, tasks, currentMileag
                                 (task.estimatedDueDate ? new Date(task.estimatedDueDate) : null);
                 
                 return (
-                  <div key={task.id} className="flex justify-between items-center py-2 px-3 rounded-md bg-gray-50">
+                  <div key={task.id} className={`flex justify-between items-center py-2 px-3 rounded-md ${
+                    task.isDue ? 'bg-red-50' : 'bg-gray-50'
+                  }`}>
                     <div>
                       <span className="font-medium text-sm">{task.task}</span>
-                      <div className="text-xs text-gray-500">
-                        {taskDate ? format(taskDate, 'MMM d, yyyy') : 'No date'} 
-                        {task.dueMileage ? ` • ${formatDistance(task.dueMileage)}` : ''}
+                      <div className="text-xs text-gray-500 flex flex-wrap gap-x-2">
+                        <span>
+                          {taskDate ? format(taskDate, 'MMM d, yyyy') : 'No date'}
+                          {!task.dueDate && task.estimatedDueDate ? ' (est.)' : ''}
+                        </span>
+                        {task.dueMileage && (
+                          <span>• {formatDistance(task.dueMileage)}</span>
+                        )}
                       </div>
                     </div>
                     
-                    <Link
-                      href={`/maintenance/${task.id}/complete`}
-                      className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                    >
-                      View
-                    </Link>
+                    <div className="flex gap-1">
+                      <Link
+                        href={`/maintenance/${task.id}/complete`}
+                        className={`text-xs px-2 py-1 rounded ${
+                          task.isDue 
+                          ? 'bg-red-600 text-white hover:bg-red-700' 
+                          : 'border border-blue-500 text-blue-700 hover:bg-blue-50'
+                        }`}
+                      >
+                        {task.isDue ? 'Overdue' : 'Complete'}
+                      </Link>
+                      <Link
+                        href={`/maintenance/${task.id}/edit`}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
+                      >
+                        Edit
+                      </Link>
+                    </div>
                   </div>
                 );
               })}

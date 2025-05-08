@@ -2,13 +2,9 @@
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-
-// Import the database configuration first
 import { db } from "./db";
-
-// Then import the schema
 import { users, motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "./schema";
-import { eq, or, isNull, and, not } from "drizzle-orm";
+import { eq, or, isNull, and, not, sql } from "drizzle-orm";
 
 // This will run migrations on the database, creating tables if they don't exist
 // and adding data
@@ -346,7 +342,7 @@ async function backfillMileageLogs() {
     for (const motorcycle of motorcyclesWithMileage) {
       // Check if this motorcycle already has any mileage logs
       const existingLogs = await db.query.mileageLogs.findMany({
-        where: eq(mileageLogs.motorcycleId, motorcycle.id)
+        where: eq(mileageLogs.motorcycleId, motorcycle.id) // Fixed: using motorcycle.id instead of record.motorcycleId
       });
       
       if (existingLogs.length === 0 && motorcycle.currentMileage) {
@@ -373,6 +369,121 @@ async function backfillMileageLogs() {
   }
 }
 
+/**
+ * Ensure maintenance records are properly logged for activity tracking
+ */
+async function ensureMaintenanceActivity() {
+  console.log("Ensuring maintenance records have proper activity entries...");
+  
+  try {
+    // Get all maintenance records
+    const records = await db.query.maintenanceRecords.findMany({
+      orderBy: (records, { asc }) => [asc(records.date)]
+    });
+    
+    console.log(`Found ${records.length} maintenance records to process`);
+    
+    // Process each record to create mileage logs if needed
+    let createdLogsCount = 0;
+    
+    for (const record of records) {
+      // If the record has mileage, create a mileage log if one doesn't exist for this record
+      if (record.mileage !== null) {
+        // Check if there's a mileage log within 5 minutes of this maintenance record
+        const recordTime = new Date(record.date).getTime();
+        const timeWindow = 5 * 60 * 1000; // 5 minutes in milliseconds
+        
+        // Find logs for this specific motorcycle
+        const existingLogs = await db.query.mileageLogs.findMany({
+          where: eq(mileageLogs.motorcycleId, record.motorcycleId)
+        });
+        
+        // Filter logs that are within the time window and have matching mileage
+        const logsInTimeWindow = existingLogs.filter(log => {
+          const logTime = new Date(log.date).getTime();
+          return Math.abs(logTime - recordTime) < timeWindow && 
+                 (record.mileage === log.newMileage);
+        });
+        
+        if (logsInTimeWindow.length === 0) {
+          // Find the motorcycle to get previous mileage if possible
+          const motorcycle = await db.query.motorcycles.findFirst({
+            where: eq(motorcycles.id, record.motorcycleId)
+          });
+          
+          if (motorcycle) {
+            // Convert the record date to ISO string for proper comparison in SQLite
+            const recordDateIso = new Date(record.date).toISOString();
+            
+            // Find any earlier maintenance records for this motorcycle to determine previous mileage
+            const earlierRecords = await db.query.maintenanceRecords.findMany({
+              where: and(
+                eq(maintenanceRecords.motorcycleId, record.motorcycleId),
+                // Use a simpler comparison approach that's compatible with SQLite
+                sql`strftime('%s', ${maintenanceRecords.date}) < strftime('%s', ${recordDateIso})`
+              ),
+              orderBy: (records, { desc }) => [desc(records.date)]
+            });
+            
+            // Use the most recent earlier record's mileage as the previous mileage
+            const previousMileage = earlierRecords.length > 0 && earlierRecords[0].mileage !== null
+              ? earlierRecords[0].mileage
+              : null;
+            
+            // Get task name if available (safely handle async call)
+            let taskName = "Maintenance";
+            if (record.taskId) {
+              try {
+                const task = await db.query.maintenanceTasks.findFirst({
+                  where: eq(maintenanceTasks.id, record.taskId)
+                });
+                if (task) taskName = task.name;
+              } catch (e) {
+                console.log(`Could not fetch task name for ${record.taskId}`);
+              }
+            }
+            
+            // Ensure we have proper date objects
+            const recordDate = record.date instanceof Date ? record.date : new Date(record.date);
+            const createdAtDate = record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt || record.date);
+            
+            // Create a mileage log for this maintenance record
+            await db.insert(mileageLogs).values({
+              id: randomUUID(),
+              motorcycleId: record.motorcycleId,
+              previousMileage: previousMileage,
+              newMileage: record.mileage,
+              date: recordDate,
+              notes: `Mileage updated during maintenance: ${taskName}`,
+              createdAt: createdAtDate
+            });
+            
+            createdLogsCount++;
+            console.log(`Created mileage log for maintenance record ${record.id}`);
+          }
+        }
+      }
+    }
+    
+    console.log(`Created ${createdLogsCount} mileage logs from maintenance records`);
+  } catch (error) {
+    console.error("Error ensuring maintenance activity:", error);
+    throw error;
+  }
+}
+
+// Helper function to get task name
+async function getTaskName(taskId: string): Promise<string> {
+  try {
+    const task = await db.query.maintenanceTasks.findFirst({
+      where: eq(maintenanceTasks.id, taskId)
+    });
+    return task ? task.name : "Maintenance";
+  } catch (error) {
+    return "Maintenance";
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   try {
@@ -380,6 +491,7 @@ async function runMigrations() {
     await ensureColumns();
     await setupExistingData();
     await backfillMileageLogs();
+    await ensureMaintenanceActivity();
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);

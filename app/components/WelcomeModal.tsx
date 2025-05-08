@@ -26,7 +26,7 @@ export default function WelcomeModal({ motorcycleName, motorcycleId }: WelcomeMo
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/30 backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen p-4">
         <div className="relative bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
           <button 

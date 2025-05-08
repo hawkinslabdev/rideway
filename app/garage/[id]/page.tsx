@@ -15,7 +15,10 @@ import {
   FileText,
   Gauge,
   DollarSign,
-  Bike
+  Bike,
+  CheckCircle,
+  AlertTriangle,
+  ListChecks
 } from "lucide-react";
 import { format } from "date-fns";
 import ClientLayout from "@/app/components/ClientLayout";
@@ -69,7 +72,7 @@ interface ActivityLog {
   details?: any;
 }
 
-type TabType = 'activity' | 'maintenance' | 'costs';
+type TabType = 'activity' | 'schedule' | 'tasks' | 'costs';
 
 export default function MotorcycleDetail() {
   const params = useParams();
@@ -115,7 +118,7 @@ export default function MotorcycleDetail() {
         
         // Generate activity logs from maintenance records
         if (data.recentMaintenance) {
-          const logs = [];
+          const logs: ActivityLog[] = [];
           
           // Add maintenance records as activity
           data.recentMaintenance.forEach((record: MaintenanceRecord) => {
@@ -133,23 +136,48 @@ export default function MotorcycleDetail() {
             });
           });
           
-          // Add motorcycle creation date as an activity
-          if (data.motorcycle.createdAt) {
-            logs.push({
-              id: 'creation',
-              type: 'mileageUpdate' as const,
-              date: new Date(data.motorcycle.createdAt),
-              description: "Motorcycle added to garage",
-              details: {
-                mileage: data.motorcycle.currentMileage
-              }
-            });
-          }
-          
-          // Sort by date, most recent first
-          logs.sort((a, b) => b.date.getTime() - a.date.getTime());
-          
-          setActivityLogs(logs);
+          // Check if we can fetch additional mileage logs
+          fetchMileageLogs(data.motorcycle.id).then(mileageLogs => {
+            const combinedLogs = [...logs, ...mileageLogs];
+            
+            // Add motorcycle creation date as an activity if needed
+            if (data.motorcycle.createdAt && !mileageLogs.some(log => log.description.includes("added to garage"))) {
+              combinedLogs.push({
+                id: 'creation',
+                type: 'mileageUpdate' as const,
+                date: new Date(data.motorcycle.createdAt),
+                description: "Motorcycle added to garage",
+                details: {
+                  mileage: data.motorcycle.currentMileage
+                }
+              });
+            }
+            
+            // Sort by date, most recent first
+            combinedLogs.sort((a, b) => b.date.getTime() - a.date.getTime());
+            
+            setActivityLogs(combinedLogs);
+          }).catch(err => {
+            console.error("Failed to fetch mileage logs:", err);
+            
+            // Add motorcycle creation date if no mileage logs
+            if (data.motorcycle.createdAt) {
+              logs.push({
+                id: 'creation',
+                type: 'mileageUpdate' as const,
+                date: new Date(data.motorcycle.createdAt),
+                description: "Motorcycle added to garage",
+                details: {
+                  mileage: data.motorcycle.currentMileage
+                }
+              });
+            }
+            
+            // Sort by date, most recent first
+            logs.sort((a, b) => b.date.getTime() - a.date.getTime());
+            
+            setActivityLogs(logs);
+          });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -160,6 +188,33 @@ export default function MotorcycleDetail() {
 
     fetchMotorcycleDetails();
   }, [params.id]);
+  
+  const fetchMileageLogs = async (motorcycleId: string): Promise<ActivityLog[]> => {
+    try {
+      const response = await fetch(`/api/motorcycles/mileage-log?motorcycleId=${motorcycleId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch mileage logs");
+      }
+      
+      const data = await response.json();
+      
+      // Convert mileage logs to activity logs
+      return data.logs.map((log: any) => ({
+        id: log.id,
+        type: 'mileageUpdate' as const,
+        date: new Date(log.date),
+        description: log.notes || `Updated mileage to ${formatDistance(log.newMileage)}`,
+        details: {
+          previousMileage: log.previousMileage,
+          newMileage: log.newMileage,
+          difference: log.previousMileage !== null ? log.newMileage - log.previousMileage : null
+        }
+      }));
+    } catch (error) {
+      console.error("Error fetching mileage logs:", error);
+      return [];
+    }
+  };
   
   const handleToggleOwnership = async () => {
     if (!motorcycle) return;
@@ -263,6 +318,10 @@ export default function MotorcycleDetail() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update mileage");
     }
+  };
+
+  const getDueTasksCount = () => {
+    return maintenanceSchedule.filter(task => task.isDue).length;
   };
 
   if (loading) {
@@ -385,6 +444,23 @@ export default function MotorcycleDetail() {
                   </div>
                 </div>
                 
+                {/* Maintenance Status */}
+                <div className="mt-4 p-3 rounded-md flex items-center gap-2">
+                  {getDueTasksCount() > 0 ? (
+                    <div className="flex items-center bg-red-50 text-red-700 rounded-md px-3 py-2 text-sm">
+                      <AlertTriangle size={18} className="mr-2" />
+                      <span>
+                        <span className="font-bold">{getDueTasksCount()}</span> maintenance {getDueTasksCount() === 1 ? 'task' : 'tasks'} due
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center bg-green-50 text-green-700 rounded-md px-3 py-2 text-sm">
+                      <CheckCircle size={18} className="mr-2" />
+                      <span>All maintenance is up to date</span>
+                    </div>
+                  )}
+                </div>
+                
                 {motorcycle.notes && (
                   <div className="mt-3">
                     <p className="text-xs text-gray-500">Notes</p>
@@ -398,7 +474,7 @@ export default function MotorcycleDetail() {
 
         {/* Tab Navigation */}
         <div className="bg-white shadow rounded-t-lg border-b">
-          <div className="flex">
+          <div className="flex flex-wrap">
             <button
               onClick={() => setActiveTab('activity')}
               className={`px-6 py-3 font-medium text-sm focus:outline-none ${
@@ -410,14 +486,24 @@ export default function MotorcycleDetail() {
               Recent Activity
             </button>
             <button
-              onClick={() => setActiveTab('maintenance')}
+              onClick={() => setActiveTab('schedule')}
               className={`px-6 py-3 font-medium text-sm focus:outline-none ${
-                activeTab === 'maintenance' 
+                activeTab === 'schedule' 
                   ? 'border-b-2 border-blue-500 text-blue-600' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Maintenance Schedule
+              Schedule
+            </button>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={`px-6 py-3 font-medium text-sm focus:outline-none ${
+                activeTab === 'tasks' 
+                  ? 'border-b-2 border-blue-500 text-blue-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Tasks
             </button>
             <button
               onClick={() => setActiveTab('costs')}
@@ -439,13 +525,22 @@ export default function MotorcycleDetail() {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Recent Activity</h2>
-                <Link 
-                  href={`/maintenance/add?motorcycle=${motorcycle.id}`}
-                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center"
-                >
-                  <Wrench size={16} className="mr-1.5" />
-                  Log Maintenance
-                </Link>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setShowMileageModal(true)}
+                    className="text-sm px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 inline-flex items-center"
+                  >
+                    <Gauge size={16} className="mr-1.5" />
+                    Update Mileage
+                  </button>
+                  <Link 
+                    href={`/maintenance/add?motorcycle=${motorcycle.id}`}
+                    className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center"
+                  >
+                    <Wrench size={16} className="mr-1.5" />
+                    Log Maintenance
+                  </Link>
+                </div>
               </div>
               
               {activityLogs.length > 0 ? (
@@ -455,7 +550,7 @@ export default function MotorcycleDetail() {
                   
                   {/* Timeline Items */}
                   <div className="space-y-4">
-                    {activityLogs.slice(0, 5).map((log) => (
+                    {activityLogs.slice(0, 8).map((log) => (
                       <div key={log.id} className="relative pl-10">
                         {/* Timeline Icon */}
                         <div className="absolute left-0 p-1 rounded-full bg-white border-2 border-blue-500">
@@ -483,10 +578,11 @@ export default function MotorcycleDetail() {
                           
                           {log.type === 'mileageUpdate' && log.details && (
                             <div className="text-sm">
-                              {log.details.mileage && <p>Mileage: {formatDistance(log.details.mileage)}</p>}
+                              {log.details.mileage && !log.details.previousMileage && <p>Mileage: {formatDistance(log.details.mileage)}</p>}
                               {log.details.previousMileage && log.details.newMileage && (
                                 <p>
                                   Updated from {formatDistance(log.details.previousMileage)} to {formatDistance(log.details.newMileage)}
+                                  {log.details.difference && ` (+${formatDistance(log.details.difference, 0)})`}
                                 </p>
                               )}
                             </div>
@@ -496,7 +592,7 @@ export default function MotorcycleDetail() {
                     ))}
                   </div>
                   
-                  {activityLogs.length > 5 && (
+                  {activityLogs.length > 8 && (
                     <div className="mt-4 text-center">
                       <Link
                         href={`/history?motorcycle=${motorcycle.id}`}
@@ -532,8 +628,8 @@ export default function MotorcycleDetail() {
             </div>
           )}
 
-          {/* Maintenance Schedule Tab */}
-          {activeTab === 'maintenance' && (
+          {/* Schedule Tab (Visual Timeline) */}
+          {activeTab === 'schedule' && (
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Maintenance Schedule</h2>
@@ -547,7 +643,7 @@ export default function MotorcycleDetail() {
               </div>
               
               {maintenanceSchedule && maintenanceSchedule.length > 0 ? (
-                <div className="space-y-6">
+                <div>
                   {/* Visual timeline component */}
                   <MaintenanceTimeline 
                     motorcycleId={motorcycle.id}
@@ -565,76 +661,18 @@ export default function MotorcycleDetail() {
                     milesPerDay={30} // You can adjust this or make it a user setting
                   />
                   
-                  {/* Original task cards */}
-                  <div className="mt-6 border-t pt-6">
-                    <h3 className="text-md font-medium mb-3">All Maintenance Tasks</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {maintenanceSchedule.map((task) => (
-                        <div key={task.id} className="border rounded-lg p-4 hover:shadow-md transition">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">{task.name}</h4>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                task.priority === "high"
-                                  ? "bg-red-100 text-red-800"
-                                  : task.priority === "medium"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-green-100 text-green-800"
-                              }`}
-                            >
-                              {task.priority}
-                            </span>
-                          </div>
-                          
-                          {task.description && (
-                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                          )}
-                          
-                          <div className="text-sm text-gray-600 space-y-1 mb-3">
-                            {task.dueDate && (
-                              <div className="flex items-center">
-                                <Calendar size={14} className="mr-1" />
-                                Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
-                              </div>
-                            )}
-                            {task.dueMileage && (
-                              <div className="flex items-center">
-                                <Wrench size={14} className="mr-1" />
-                                Or at: {formatDistance(task.dueMileage)}
-                              </div>
-                            )}
-                            
-                            {task.lastCompleted && (
-                              <div className="flex items-center text-xs text-gray-500 mt-2">
-                                <Clock size={12} className="mr-1" />
-                                Last done: {format(new Date(task.lastCompleted), "MMM d, yyyy")}
-                                {task.lastMileage && ` at ${formatDistance(task.lastMileage)}`}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex space-x-2">
-                            <Link 
-                              href={`/maintenance/${task.id}/complete`}
-                              className="flex-1 text-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                            >
-                              Mark Complete
-                            </Link>
-                            <Link
-                              href={`/maintenance/${task.id}/edit`}
-                              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                            >
-                              Edit
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="mt-6 flex justify-center">
+                    <Link
+                      href={`/maintenance?motorcycle=${motorcycle.id}`}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    >
+                      View Full Maintenance Schedule
+                    </Link>
                   </div>
                 </div>
               ) : (
                 <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <Wrench className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                  <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-3" />
                   <p className="text-gray-500 mb-4">No maintenance tasks scheduled yet</p>
                   <Link
                     href={`/maintenance/add?motorcycle=${motorcycle.id}`}
@@ -645,14 +683,99 @@ export default function MotorcycleDetail() {
                   </Link>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Tasks Tab (Task Cards) */}
+          {activeTab === 'tasks' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Maintenance Tasks</h2>
+                <Link
+                  href={`/maintenance/add?motorcycle=${motorcycle.id}`}
+                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center"
+                >
+                  <ListChecks size={16} className="mr-1.5" />
+                  Add Task
+                </Link>
+              </div>
               
-              {maintenanceSchedule && maintenanceSchedule.length > 0 && (
-                <div className="mt-6 flex justify-center">
+              {maintenanceSchedule && maintenanceSchedule.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {maintenanceSchedule.map((task) => (
+                    <div 
+                      key={task.id} 
+                      className={`border ${task.isDue ? 'border-red-200 bg-red-50' : 'border-gray-200'} rounded-lg p-4 hover:shadow-md transition`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{task.name}</h4>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            task.priority === "high"
+                              ? "bg-red-100 text-red-800"
+                              : task.priority === "medium"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {task.priority}
+                        </span>
+                      </div>
+                      
+                      {task.description && (
+                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                      )}
+                      
+                      <div className="text-sm text-gray-600 space-y-1 mb-3">
+                        {task.dueDate && (
+                          <div className="flex items-center">
+                            <Calendar size={14} className="mr-1" />
+                            Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
+                          </div>
+                        )}
+                        {task.dueMileage && (
+                          <div className="flex items-center">
+                            <Wrench size={14} className="mr-1" />
+                            Or at: {formatDistance(task.dueMileage)}
+                          </div>
+                        )}
+                        
+                        {task.lastCompleted && (
+                          <div className="flex items-center text-xs text-gray-500 mt-2">
+                            <Clock size={12} className="mr-1" />
+                            Last done: {format(new Date(task.lastCompleted), "MMM d, yyyy")}
+                            {task.lastMileage && ` at ${formatDistance(task.lastMileage)}`}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Link 
+                          href={`/maintenance/${task.id}/complete`}
+                          className="flex-1 text-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                        >
+                          Mark Complete
+                        </Link>
+                        <Link
+                          href={`/maintenance/${task.id}/edit`}
+                          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                        >
+                          Edit
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-8 text-center">
+                  <Wrench className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                  <p className="text-gray-500 mb-4">No maintenance tasks created yet</p>
                   <Link
-                    href={`/maintenance?motorcycle=${motorcycle.id}`}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    href={`/maintenance/add?motorcycle=${motorcycle.id}`}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    View All Maintenance Tasks
+                    <ListChecks size={16} className="mr-2" />
+                    Add First Maintenance Task
                   </Link>
                 </div>
               )}

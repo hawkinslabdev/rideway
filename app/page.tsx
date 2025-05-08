@@ -29,10 +29,12 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [stats, setStats] = useState({
-    totalMiles: 0,
-    maintenanceCost: 0,
     motorcyclesCount: 0,
-    completedTasks: 0
+    maintenanceCount: 0,
+    distanceUntilNextMaint: null as number | null,
+    daysUntilNextMaint: null as number | null,
+    nextMaintenanceByDistance: null as any,
+    nextMaintenanceByTime: null as any
   });
   const [isFirstVisit, setIsFirstVisit] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
@@ -77,8 +79,64 @@ export default function Dashboard() {
       
       // Calculate stats
       if (data.motorcycles && data.motorcycles.length > 0) {
-        const totalMiles = data.motorcycles.reduce((acc: number, moto: any) => 
-          acc + (moto.currentMileage || 0), 0);
+        // Count non-archived motorcycles
+        const activeMotorcyclesCount = data.motorcycles.filter((m: any) => m.isOwned !== false).length;
+        
+        // Maintenance due count from the API
+        const maintenanceDueCount = data.overdueCount || 0;
+        
+        // Find next maintenance task by distance
+        let nextMaintenanceByDistance = null;
+        let distanceUntilNextMaint = Infinity;
+        
+        // Find next maintenance task by time
+        let nextMaintenanceByTime = null;
+        let daysUntilNextMaint = Infinity;
+        
+        // Get today's date for calculations
+        const today = new Date();
+        
+        // Process upcoming maintenance tasks
+        if (data.upcomingMaintenance && data.upcomingMaintenance.length > 0) {
+          data.upcomingMaintenance.forEach((task: any) => {
+            // Find the motorcycle for this task
+            const taskMotorcycle = data.motorcycles.find((m: any) => m.id === task.motorcycleId);
+            
+            // Skip if motorcycle not found or not owned
+            if (!taskMotorcycle || taskMotorcycle.isOwned === false) return;
+            
+            // Calculate distance until next maintenance
+            if (task.dueMileage && taskMotorcycle.currentMileage) {
+              const remainingDistance = task.dueMileage - taskMotorcycle.currentMileage;
+              if (remainingDistance > 0 && remainingDistance < distanceUntilNextMaint) {
+                distanceUntilNextMaint = remainingDistance;
+                nextMaintenanceByDistance = task;
+              }
+            }
+            
+            // Calculate time until next maintenance
+            if (task.dueDate) {
+              const dueDate = new Date(task.dueDate);
+              const diffTime = Math.max(0, dueDate.getTime() - today.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              
+              if (diffDays < daysUntilNextMaint) {
+                daysUntilNextMaint = diffDays;
+                nextMaintenanceByTime = task;
+              }
+            }
+          });
+        }
+        
+        // Set the stats with the new values
+        setStats({
+          motorcyclesCount: activeMotorcyclesCount,
+          maintenanceCount: maintenanceDueCount,
+          distanceUntilNextMaint: distanceUntilNextMaint === Infinity ? null : distanceUntilNextMaint,
+          daysUntilNextMaint: daysUntilNextMaint === Infinity ? null : daysUntilNextMaint,
+          nextMaintenanceByDistance,
+          nextMaintenanceByTime
+        });
         
         // Find the default motorcycle for the mileage update feature
         const defaultMotorcycle = data.motorcycles.find((m: any) => m.isDefault) || 
@@ -88,14 +146,7 @@ export default function Dashboard() {
         if (defaultMotorcycle?.currentMileage) {
           setNewMileage(defaultMotorcycle.currentMileage.toString());
         }
-        
-        setStats({
-          totalMiles,
-          maintenanceCost: 0, // This would need another API call
-          motorcyclesCount: data.motorcycles.length,
-          completedTasks: 0 // This would need another API call
-        });
-      }
+      }      
     } catch (err) {
       console.error("Dashboard error:", err);
       setError("Failed to load dashboard data");
@@ -359,33 +410,41 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
-                  <div className="bg-green-100 rounded-full p-3 mr-3">
-                    <Gauge size={20} className="text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Total Mileage</p>
-                    <p className="text-xl font-bold">{formatDistance(stats.totalMiles)}</p>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                <div className={`bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center ${dashboardData.overdueCount > 0 ? 'border-red-200' : ''}`}>
                   <div className={`rounded-full p-3 mr-3 ${dashboardData.overdueCount > 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
                     <Wrench size={20} className={dashboardData.overdueCount > 0 ? 'text-red-600' : 'text-amber-600'} />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Maintenance Due</p>
-                    <p className="text-xl font-bold">{dashboardData.overdueCount || 0}</p>
+                    <p className="text-xl font-bold">{stats.maintenanceCount}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
+                  <div className="bg-green-100 rounded-full p-3 mr-3">
+                    <Gauge size={20} className="text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Next Maintenance</p>
+                    {stats.distanceUntilNextMaint ? (
+                      <p className="text-lg font-bold">{formatDistance(stats.distanceUntilNextMaint)}</p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Not set</p>
+                    )}
                   </div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center">
                   <div className="bg-purple-100 rounded-full p-3 mr-3">
-                    <Check size={20} className="text-purple-600" />
+                    <Clock size={20} className="text-purple-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Completed Tasks</p>
-                    <p className="text-xl font-bold">{stats.completedTasks}</p>
+                    <p className="text-xs text-gray-500">Time Until Next</p>
+                    {stats.daysUntilNextMaint !== null ? (
+                      <p className="text-lg font-bold">{stats.daysUntilNextMaint} {stats.daysUntilNextMaint === 1 ? 'day' : 'days'}</p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Not scheduled</p>
+                    )}
                   </div>
                 </div>
               </div>
