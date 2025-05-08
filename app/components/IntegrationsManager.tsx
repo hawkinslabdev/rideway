@@ -11,6 +11,7 @@ import {
 import WebhookTemplateEditor from './WebhookTemplateEditor';
 import { IntegrationType, EventType } from '../lib/types/integrations';
 import { toast } from 'react-hot-toast';
+import { JSX } from 'react/jsx-runtime';
 
 // Types for UI state
 interface Integration {
@@ -1171,6 +1172,7 @@ interface WebhookConfigFormProps {
           events: updatedEvents
         };
       });
+    };    
 
       const handleTemplateChange = (template: string) => {
         if (!activeEventType) return;
@@ -1191,6 +1193,7 @@ interface WebhookConfigFormProps {
             events: updatedEvents
           };
         });
+      };
 
     const handleSave = async () => {
       try {
@@ -1360,13 +1363,27 @@ interface WebhookConfigFormProps {
                   Events to Trigger
                 </label>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  {integration.events.map((event: any) => (
-                    <div key={event.eventType} className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">
-                          {event.eventType.replace(/_/g, ' ')}
-                        </span>
-                      </div>
+                {integration.events.map((event: any) => (
+                  <div key={event.eventType} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">
+                        {event.eventType.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      {/* Only show template editing button for webhook integrations */}
+                      {integration.type === 'webhook' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveEventType(event.eventType);
+                            setShowTemplateEditor(true);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 mr-3"
+                        >
+                          Edit Template
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleEvent(event.eventType)}
@@ -1380,7 +1397,8 @@ interface WebhookConfigFormProps {
                         `} />
                       </button>
                     </div>
-                  ))}
+                  </div>
+                ))}
                 </div>
               </div>
             </div>
@@ -1415,5 +1433,77 @@ interface WebhookConfigFormProps {
         </div>
       </div>
     );
-  }
+
+    {showTemplateEditor && activeEventType && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center px-6 py-4 border-b">
+          <h2 className="text-xl font-semibold">
+            Edit Webhook Template: {(activeEventType || '').replace(/_/g, ' ')}
+          </h2>
+          <button 
+            onClick={() => setShowTemplateEditor(false)}
+            className="p-1 rounded-full hover:bg-gray-200"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          <WebhookTemplateEditor
+            eventType={activeEventType || ''}
+            initialTemplate={integration.events.find((e: IntegrationEvent) => e.eventType === activeEventType)?.payloadTemplate || ''}
+            onChange={handleTemplateChange}
+          />
+        </div>
+        
+        <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+          <button
+            onClick={() => setShowTemplateEditor(false)}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+  {integration.type === 'webhook' && (
+    <div className="mt-4 border-t pt-4">
+      <div className="flex justify-between items-center mb-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Custom Payload Templates
+        </label>
+        <div className="flex items-center">
+          <span className="text-sm mr-2 text-gray-500">
+            {integration.config.useCustomPayload ? 'Enabled' : 'Disabled'}
+          </span>
+          <button
+            onClick={() => handleConfigChange('useCustomPayload', !integration.config.useCustomPayload)}
+            className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
+              integration.config.useCustomPayload ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          >
+            <span className={`
+              inline-block w-4 h-4 transform rounded-full bg-white transition-transform
+              ${integration.config.useCustomPayload ? 'translate-x-6' : 'translate-x-1'}
+            `} />
+          </button>
+        </div>
+      </div>
+      
+      <div className={integration.config.useCustomPayload ? "" : "opacity-50 pointer-events-none"}>
+        <p className="text-sm text-gray-500 mb-2">
+          Custom payload templates allow you to format your webhook data for specific services.
+          Click on "Edit Template" next to each event to customize how data is sent.
+        </p>
+        
+        <div className="flex items-center text-sm text-blue-600">
+          <Info size={16} className="mr-1.5" />
+          <span>You can use variables like {"{{motorcycle.name}}"} in your templates</span>
+        </div>
+      </div>
+    </div>
+  )}
+}
   
