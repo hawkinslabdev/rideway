@@ -579,6 +579,128 @@ async function ensurePasswordResetTable() {
   }
 }
 
+// Ensure the integrations table is created
+async function ensureIntegrationsTable() {
+  console.log("Ensuring integrations table exists...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='integrations'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE integrations (
+          id TEXT PRIMARY KEY,
+          userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          active INTEGER DEFAULT 1,
+          config TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created integrations table");
+    }
+  } catch (error) {
+    console.error("Error ensuring integrations table:", error);
+    throw error;
+  }
+}
+
+// Ensure the integration_events table is created
+async function ensureIntegrationEventsTable() {
+  console.log("Ensuring integration_events table exists...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='integration_events'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE integration_events (
+          id TEXT PRIMARY KEY,
+          integrationId TEXT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
+          eventType TEXT NOT NULL,
+          enabled INTEGER DEFAULT 1,
+          templateData TEXT,
+          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created integration_events table");
+    }
+  } catch (error) {
+    console.error("Error ensuring integration_events table:", error);
+    throw error;
+  }
+}
+
+// Ensure the integration_event_logs table is created
+async function ensureIntegrationEventLogsTable() {
+  console.log("Ensuring integration_event_logs table exists...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='integration_event_logs'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE integration_event_logs (
+          id TEXT PRIMARY KEY,
+          integrationId TEXT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
+          eventType TEXT NOT NULL,
+          status TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created integration_event_logs table");
+    }
+  } catch (error) {
+    console.error("Error ensuring integration_event_logs table:", error);
+    throw error;
+  }
+}
+
+// Ensure the integration_templates table is created
+async function ensureIntegrationTemplatesTable() {
+  console.log("Ensuring integration_templates table exists...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='integration_templates'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE integration_templates (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          type TEXT NOT NULL,
+          defaultConfig TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created integration_templates table");
+    }
+  } catch (error) {
+    console.error("Error ensuring integration_templates table:", error);
+    throw error;
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   try {
@@ -589,6 +711,10 @@ async function runMigrations() {
     await ensureMaintenanceActivity();
     await cleanupDuplicateMileageLogs();
     await ensurePasswordResetTable();
+    await ensureIntegrationsTable();
+    await ensureIntegrationEventsTable();
+    await ensureIntegrationEventLogsTable();
+    await ensureIntegrationTemplatesTable();
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);

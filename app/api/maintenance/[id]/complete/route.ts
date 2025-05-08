@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { maintenanceTasks, maintenanceRecords, motorcycles } from "@/app/lib/db/schema";
+import { triggerEvent } from "@/app/lib/services/integrationService";
 import { eq, and } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -152,8 +153,7 @@ export async function POST(
       })
       .where(eq(maintenanceTasks.id, task.id));
 
-    // If the mileage is provided and greater than the current motorcycle mileage,
-    // update the motorcycle's current mileage
+    // If the mileage is provided and greater than the current motorcycle mileage, update the motorcycle's current mileage
     if (maintenanceMileage && (motorcycle.currentMileage === null || maintenanceMileage > motorcycle.currentMileage)) {
       await db.update(motorcycles)
         .set({
@@ -162,6 +162,28 @@ export async function POST(
         })
         .where(eq(motorcycles.id, task.motorcycleId));
     }
+
+    // Trigger an event for the integration
+    await triggerEvent(session.user.id, "maintenance_completed", {
+      task: {
+        id: task.id,
+        name: task.name
+      },
+      motorcycle: {
+        id: motorcycle.id,
+        name: motorcycle.name,
+        make: motorcycle.make,
+        model: motorcycle.model,
+        year: motorcycle.year
+      },
+      record: {
+        id: newRecord[0].id,
+        date: maintenanceDate,
+        mileage: maintenanceMileage,
+        cost: body.cost || null,
+        notes: body.notes || null
+      }
+    });
 
     return NextResponse.json({
       message: "Maintenance task completed successfully",

@@ -2,6 +2,7 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
+
 // Users table
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -87,6 +88,51 @@ export const passwordResetTokens = sqliteTable("password_reset_tokens", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
 
+// Integrations table
+export const integrations = sqliteTable("integrations", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // "webhook", "homeassistant", "ntfy", etc.
+  active: integer("active", { mode: "boolean" }).default(true),
+  config: text("config").notNull(), // Encrypted JSON string of configuration
+  createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updatedAt").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+// Integration events table
+export const integrationEvents = sqliteTable("integration_events", {
+  id: text("id").primaryKey(),
+  integrationId: text("integrationId").notNull().references(() => integrations.id, { onDelete: "cascade" }),
+  eventType: text("eventType").notNull(), // "maintenance_due", "mileage_updated", etc.
+  enabled: integer("enabled", { mode: "boolean" }).default(true),
+  templateData: text("templateData"), // Optional JSON for event-specific template data
+  createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updatedAt").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+// Integration templates (for quick setup)
+export const integrationTemplates = sqliteTable("integration_templates", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // "webhook", "homeassistant", "ntfy", etc.
+  defaultConfig: text("defaultConfig").notNull(), // JSON template for configuration
+  createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+// Integration event log 
+export const integrationEventLogs = sqliteTable("integration_event_logs", {
+  id: text("id").primaryKey(),
+  integrationId: text("integrationId").notNull().references(() => integrations.id, { onDelete: "cascade" }),
+  eventType: text("eventType").notNull(),
+  status: text("status").notNull(), // "success", "failed"
+  statusMessage: text("statusMessage"),
+  requestData: text("requestData"), // What was sent (sanitized)
+  responseData: text("responseData"), // What was received
+  createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 // Define relationships
 export const motorcyclesRelations = relations(motorcycles, ({ one, many }) => ({
   user: one(users, {
@@ -120,5 +166,24 @@ export const mileageLogsRelations = relations(mileageLogs, ({ one }) => ({
   motorcycle: one(motorcycles, {
     fields: [mileageLogs.motorcycleId],
     references: [motorcycles.id],
+  }),
+}));
+
+export const integrationsRelations = relations(integrations, ({ many }) => ({
+  events: many(integrationEvents),
+  logs: many(integrationEventLogs),
+}));
+
+export const integrationEventsRelations = relations(integrationEvents, ({ one }) => ({
+  integration: one(integrations, {
+    fields: [integrationEvents.integrationId],
+    references: [integrations.id],
+  }),
+}));
+
+export const integrationEventLogsRelations = relations(integrationEventLogs, ({ one }) => ({
+  integration: one(integrations, {
+    fields: [integrationEventLogs.integrationId],
+    references: [integrations.id],
   }),
 }));

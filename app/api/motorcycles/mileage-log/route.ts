@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, mileageLogs } from "@/app/lib/db/schema";
+import { triggerEvent } from "@/app/lib/services/integrationService";
 import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -69,6 +70,19 @@ export async function POST(request: Request) {
         updatedAt: new Date()
       })
       .where(eq(motorcycles.id, motorcycleId));
+
+    // Trigger an event for the mileage update
+    await triggerEvent(session.user.id, "mileage_updated", {
+      motorcycle: {
+        id: motorcycle.id,
+        name: motorcycle.name,
+        make: motorcycle.make,
+        model: motorcycle.model,
+        year: motorcycle.year
+      },
+      previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
+      newMileage: newMileage
+    });
 
     return NextResponse.json(logEntry[0], { status: 201 });
   } catch (error) {
