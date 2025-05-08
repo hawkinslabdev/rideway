@@ -1122,327 +1122,169 @@ interface WebhookConfigFormProps {
     onSave: () => void;
   }
   
-  function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegrationModalProps): JSX.Element {
-    const [integration, setIntegration] = useState<any | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [activeEventType, setActiveEventType] = useState<string | null>(null);
-    const [showTemplateEditor, setShowTemplateEditor] = useState(false);
-    
-    useEffect(() => {
-      fetchIntegration();
-    }, [integrationId]);
-    
-    const fetchIntegration = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const response = await fetch(`/api/user/integrations/${integrationId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch integration');
-        }
-        
-        const data = await response.json();
-        setIntegration(data);
-      } catch (err) {
-        setError('Failed to load integration details');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegrationModalProps): JSX.Element {
+  const [integration, setIntegration] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeEventType, setActiveEventType] = useState<string | null>(null);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  
+  useEffect(() => {
+    fetchIntegration();
+  }, [integrationId]);
+  
+  const fetchIntegration = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/user/integrations/${integrationId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch integration');
       }
-    };
+      
+      const data = await response.json();
+      setIntegration(data);
+    } catch (err) {
+      setError('Failed to load integration details');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleTemplateChange = (template: string) => {
+    if (!activeEventType) return;
     
-    const toggleUseCustomPayload = (eventType: string) => {
-      setIntegration((prev: typeof integration) => {
-        // Find the event to update
-        const updatedEvents = prev.events.map((event: any) => 
-          event.eventType === eventType 
-            ? { 
-                ...event, 
-                useCustomPayload: !event.useCustomPayload
-              } 
-            : event
-        );
-        
-        return {
-          ...prev,
-          events: updatedEvents
-        };
-      });
-    };    
-
-      const handleTemplateChange = (template: string) => {
-        if (!activeEventType) return;
-        
-        setIntegration((prev: typeof integration) => {
-          // Find the event to update
-          const updatedEvents = prev.events.map((event: any) => 
-            event.eventType === activeEventType 
-              ? { 
-                  ...event, 
-                  payloadTemplate: template
-                } 
-              : event
-          );
-          
-          return {
-            ...prev,
-            events: updatedEvents
-          };
-        });
-      };
-
-    const handleSave = async () => {
-      try {
-        setIsSaving(true);
-        setError(null);
-        
-        const response = await fetch(`/api/user/integrations/${integrationId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: integration.name,
-            config: integration.config,
-            events: integration.events
-          })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to update integration');
-        }
-        
-        toast.success('Integration updated successfully');
-        onSave();
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsSaving(false);
-      }
-    };
-    
-    const handleConfigChange = (key: string, value: any) => {
-      setIntegration((prev: typeof integration) => ({
+    setIntegration((prev: typeof integration) => {
+      // Find the event to update
+      const updatedEvents = prev.events.map((event: any) => 
+        event.eventType === activeEventType 
+          ? { 
+              ...event, 
+              payloadTemplate: template
+            } 
+          : event
+      );
+      
+      return {
         ...prev,
-        config: {
-          ...prev.config,
+        events: updatedEvents
+      };
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      const response = await fetch(`/api/user/integrations/${integrationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: integration.name,
+          config: integration.config,
+          events: integration.events
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update integration');
+      }
+      
+      toast.success('Integration updated successfully');
+      onSave();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleConfigChange = (key: string, value: any) => {
+    setIntegration((prev: typeof integration) => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        [key]: value
+      }
+    }));
+  };
+  
+  const handleNestedConfigChange = (parentKey: string, key: string, value: any) => {
+    setIntegration((prev: typeof integration) => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        [parentKey]: {
+          ...(prev.config)[parentKey],
           [key]: value
         }
-      }));
-    };
-    
-    const handleNestedConfigChange = (parentKey: string, key: string, value: any) => {
-      setIntegration((prev: typeof integration) => ({
-        ...prev,
-        config: {
-          ...prev.config,
-          [parentKey]: {
-            ...(prev.config)[parentKey],
-            [key]: value
-          }
-        }
-      }));
-    };
-    
-    const toggleEvent = (eventType: EventType) => {
-      setIntegration((prev: typeof integration) => ({
-        ...prev,
-        events: prev.events.map((event: any) => 
-          event.eventType === eventType 
-            ? { ...event, enabled: !event.enabled } 
-            : event
-        )
-      }));
-    };
-    
-    if (isLoading) {
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-xl w-full p-6">
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    
-    if (!integration) {
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-xl w-full p-6">
-            <div className="text-center">
-              <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">
-                Integration Not Found
-              </h3>
-              <p className="text-gray-500 mb-4">
-                {error || "The integration could not be found."}
-              </p>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    
+      }
+    }));
+  };
+  
+  const toggleEvent = (eventType: EventType) => {
+    setIntegration((prev: typeof integration) => ({
+      ...prev,
+      events: prev.events.map((event: any) => 
+        event.eventType === eventType 
+          ? { ...event, enabled: !event.enabled } 
+          : event
+      )
+    }));
+  };
+  
+  if (isLoading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <div className="flex justify-between items-center px-6 py-4 border-b">
-            <h2 className="text-xl font-semibold">Edit Integration</h2>
-            <button 
-              onClick={onClose}
-              className="p-1 rounded-full hover:bg-gray-200"
-            >
-              <X size={20} />
-            </button>
+        <div className="bg-white rounded-lg max-w-xl w-full p-6">
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-6">
-            {error && (
-              <div className="mb-4 bg-red-50 border border-red-200 rounded p-3 flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                <span className="text-red-700">{error}</span>
-              </div>
-            )}
-            
-            <div className="space-y-6">
-              {/* Integration Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Integration Name
-                </label>
-                <input
-                  type="text"
-                  value={integration.name}
-                  onChange={(e) => setIntegration({...integration, name: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="My Integration"
-                />
-              </div>
-              
-              {/* Type-specific configuration */}
-              {integration.type === 'webhook' && (
-                <WebhookConfigForm 
-                  config={integration.config}
-                  onChange={handleConfigChange}
-                  onNestedChange={handleNestedConfigChange}
-                />
-              )}
-              
-              {integration.type === 'homeassistant' && (
-                <HomeAssistantConfigForm 
-                  config={integration.config}
-                  onChange={handleConfigChange}
-                />
-              )}
-              
-              {integration.type === 'ntfy' && (
-                <NtfyConfigForm 
-                  config={integration.config}
-                  onChange={handleConfigChange}
-                  onNestedChange={handleNestedConfigChange}
-                />
-              )}
-              
-              {/* Events configuration */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Events to Trigger
-                </label>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                {integration.events.map((event: any) => (
-                  <div key={event.eventType} className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium">
-                        {event.eventType.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      {/* Only show template editing button for webhook integrations */}
-                      {integration.type === 'webhook' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveEventType(event.eventType);
-                            setShowTemplateEditor(true);
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-800 mr-3"
-                        >
-                          Edit Template
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => toggleEvent(event.eventType)}
-                        className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
-                          event.enabled ? 'bg-blue-600' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span className={`
-                          inline-block w-4 h-4 transform rounded-full bg-white transition-transform
-                          ${event.enabled ? 'translate-x-6' : 'translate-x-1'}
-                        `} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="px-6 py-4 border-t bg-gray-50 flex justify-between">
+        </div>
+      </div>
+    );
+  }
+  
+  if (!integration) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-xl w-full p-6">
+          <div className="text-center">
+            <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+            <h3 className="text-lg font-medium text-gray-900 mb-1">
+              Integration Not Found
+            </h3>
+            <p className="text-gray-500 mb-4">
+              {error || "The integration could not be found."}
+            </p>
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              Cancel
-            </button>
-            
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {isSaving ? (
-                <>
-                  <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save size={16} className="inline-block mr-1" />
-                  Save Changes
-                </>
-              )}
+              Close
             </button>
           </div>
         </div>
       </div>
     );
-
-    {showTemplateEditor && activeEventType && (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+  }
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h2 className="text-xl font-semibold">
-            Edit Webhook Template: {(activeEventType || '').replace(/_/g, ' ')}
-          </h2>
+          <h2 className="text-xl font-semibold">Edit Integration</h2>
           <button 
-            onClick={() => setShowTemplateEditor(false)}
+            onClick={onClose}
             className="p-1 rounded-full hover:bg-gray-200"
           >
             <X size={20} />
@@ -1450,60 +1292,186 @@ interface WebhookConfigFormProps {
         </div>
         
         <div className="flex-1 overflow-y-auto p-6">
-          <WebhookTemplateEditor
-            eventType={activeEventType || ''}
-            initialTemplate={integration.events.find((e: IntegrationEvent) => e.eventType === activeEventType)?.payloadTemplate || ''}
-            onChange={handleTemplateChange}
-          />
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded p-3 flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <span className="text-red-700">{error}</span>
+            </div>
+          )}
+          
+          <div className="space-y-6">
+            {/* Integration Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Integration Name
+              </label>
+              <input
+                type="text"
+                value={integration.name}
+                onChange={(e) => setIntegration({...integration, name: e.target.value})}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="My Integration"
+              />
+            </div>
+            
+            {/* Type-specific configuration */}
+            {integration.type === 'webhook' && (
+              <WebhookConfigForm 
+                config={integration.config}
+                onChange={handleConfigChange}
+                onNestedChange={handleNestedConfigChange}
+              />
+            )}
+            
+            {integration.type === 'homeassistant' && (
+              <HomeAssistantConfigForm 
+                config={integration.config}
+                onChange={handleConfigChange}
+              />
+            )}
+            
+            {integration.type === 'ntfy' && (
+              <NtfyConfigForm 
+                config={integration.config}
+                onChange={handleConfigChange}
+                onNestedChange={handleNestedConfigChange}
+              />
+            )}
+            
+            {/* Events configuration */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Events to Trigger
+              </label>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                {integration.events.map((event: IntegrationEvent) => (
+                  <div key={event.eventType} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">
+                        {event.eventType.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleEvent(event.eventType as EventType)}
+                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
+                        event.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`
+                        inline-block w-4 h-4 transform rounded-full bg-white transition-transform
+                        ${event.enabled ? 'translate-x-6' : 'translate-x-1'}
+                      `} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Custom Payload section */}
+            {integration.type === 'webhook' && (
+              <div className="mt-4 border-t pt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Custom Payload Templates
+                  </label>
+                  <div className="flex items-center">
+                    <span className="text-sm mr-2 text-gray-500">
+                      {integration.config.useCustomPayload ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <button
+                      onClick={() => handleConfigChange('useCustomPayload', !integration.config.useCustomPayload)}
+                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
+                        integration.config.useCustomPayload ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`
+                        inline-block w-4 h-4 transform rounded-full bg-white transition-transform
+                        ${integration.config.useCustomPayload ? 'translate-x-6' : 'translate-x-1'}
+                      `} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className={integration.config.useCustomPayload ? "" : "opacity-50 pointer-events-none"}>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Custom payload templates allow you to format your webhook data for specific services.
+                    Click on "Edit Template" next to each event to customize how data is sent.
+                  </p>
+                  
+                  <div className="flex items-center text-sm text-blue-600">
+                    <Info size={16} className="mr-1.5" />
+                    <span>You can use variables like {"{{motorcycle.name}}"} in your templates</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+        <div className="px-6 py-4 border-t bg-gray-50 flex justify-between">
           <button
-            onClick={() => setShowTemplateEditor(false)}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
-            Done
+            Cancel
+          </button>
+          
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {isSaving ? (
+              <>
+                <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save size={16} className="inline-block mr-1" />
+                Save Changes
+              </>
+            )}
           </button>
         </div>
       </div>
-    </div>
-  )}
-  {integration.type === 'webhook' && (
-    <div className="mt-4 border-t pt-4">
-      <div className="flex justify-between items-center mb-2">
-        <label className="block text-sm font-medium text-gray-700">
-          Custom Payload Templates
-        </label>
-        <div className="flex items-center">
-          <span className="text-sm mr-2 text-gray-500">
-            {integration.config.useCustomPayload ? 'Enabled' : 'Disabled'}
-          </span>
-          <button
-            onClick={() => handleConfigChange('useCustomPayload', !integration.config.useCustomPayload)}
-            className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
-              integration.config.useCustomPayload ? 'bg-blue-600' : 'bg-gray-300'
-            }`}
-          >
-            <span className={`
-              inline-block w-4 h-4 transform rounded-full bg-white transition-transform
-              ${integration.config.useCustomPayload ? 'translate-x-6' : 'translate-x-1'}
-            `} />
-          </button>
+
+      {/* Template Editor Modal - include it inside the parent component return */}
+      {showTemplateEditor && activeEventType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h2 className="text-xl font-semibold">
+                Edit Webhook Template: {(activeEventType || '').replace(/_/g, ' ')}
+              </h2>
+              <button 
+                onClick={() => setShowTemplateEditor(false)}
+                className="p-1 rounded-full hover:bg-gray-200"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <WebhookTemplateEditor
+                eventType={activeEventType || ''}
+                initialTemplate={integration.events.find((e: IntegrationEvent) => e.eventType === activeEventType)?.payloadTemplate || ''}
+                onChange={handleTemplateChange}
+              />
+            </div>
+            
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowTemplateEditor(false)}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-      
-      <div className={integration.config.useCustomPayload ? "" : "opacity-50 pointer-events-none"}>
-        <p className="text-sm text-gray-500 mb-2">
-          Custom payload templates allow you to format your webhook data for specific services.
-          Click on "Edit Template" next to each event to customize how data is sent.
-        </p>
-        
-        <div className="flex items-center text-sm text-blue-600">
-          <Info size={16} className="mr-1.5" />
-          <span>You can use variables like {"{{motorcycle.name}}"} in your templates</span>
-        </div>
-      </div>
+      )}
     </div>
-  )}
+  );
 }
-  
