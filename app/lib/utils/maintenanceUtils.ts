@@ -17,6 +17,8 @@ export async function checkForNewlyDueTasks(
   newMileage: number
 ): Promise<number> {
   try {
+    console.log(`Checking for newly due tasks: motorcycleId=${motorcycleId}, oldMileage=${oldMileage}, newMileage=${newMileage}`);
+    
     // First, get the motorcycle details
     const motorcycle = await db.query.motorcycles.findFirst({
       where: eq(motorcycles.id, motorcycleId),
@@ -35,16 +37,25 @@ export async function checkForNewlyDueTasks(
       ),
     });
     
+    console.log(`Found ${tasks.length} maintenance tasks for motorcycle ${motorcycleId}`);
+    
     // Find tasks that became due with this mileage update
     const newlyDueTasks = tasks.filter(task => {
       // Check if the task has a mileage threshold and it's now due
-      return task.nextDueOdometer !== null && 
+      const isDue = task.nextDueOdometer !== null && 
              task.nextDueOdometer <= newMileage &&
              (oldMileage === null || task.nextDueOdometer > oldMileage);
+             
+      console.log(`Task ${task.id} (${task.name}): nextDueOdometer=${task.nextDueOdometer}, isDue=${isDue}`);
+      return isDue;
     });
+    
+    console.log(`Found ${newlyDueTasks.length} newly due tasks`);
     
     // Trigger maintenance_due event for each task that just became due
     for (const task of newlyDueTasks) {
+      console.log(`Triggering maintenance_due event for task: ${task.name} (${task.id})`);
+      
       await triggerEvent(userId, "maintenance_due", {
         motorcycle: {
           id: motorcycle.id,
@@ -58,7 +69,8 @@ export async function checkForNewlyDueTasks(
           name: task.name
         }
       });
-      console.log(`Triggered maintenance_due event for task: ${task.name}`);
+      
+      console.log(`Successfully triggered maintenance_due event for task: ${task.name}`);
     }
     
     return newlyDueTasks.length;
@@ -124,6 +136,93 @@ export async function checkForDueTimeBasedTasks(userId: string): Promise<number>
     return 0;
   }
 }
+
+/**
+ * Checks for maintenance tasks that became due after a mileage update
+ * Returns the list of newly due tasks WITHOUT triggering any events
+ */
+export async function findNewlyDueTasks(
+    motorcycleId: string, 
+    oldMileage: number | null,
+    newMileage: number
+  ): Promise<Array<{task: any, motorcycle: any}>> {
+    try {
+      // First, get the motorcycle details
+      const motorcycle = await db.query.motorcycles.findFirst({
+        where: eq(motorcycles.id, motorcycleId),
+      });
+      
+      if (!motorcycle) {
+        console.error(`Motorcycle not found: ${motorcycleId}`);
+        return [];
+      }
+      
+      // Get all non-archived tasks for this motorcycle
+      const tasks = await db.query.maintenanceTasks.findMany({
+        where: and(
+          eq(maintenanceTasks.motorcycleId, motorcycleId),
+          eq(maintenanceTasks.archived, false)
+        ),
+      });
+      
+      // Find tasks that became due with this mileage update
+      const newlyDueTasks = tasks.filter(task => {
+        // Check if the task has a mileage threshold and it's now due
+        return task.nextDueOdometer !== null && 
+               task.nextDueOdometer <= newMileage &&
+               (oldMileage === null || task.nextDueOdometer > oldMileage);
+      });
+      
+      // Return the newly due tasks with their motorcycle info
+      return newlyDueTasks.map(task => ({
+        task,
+        motorcycle
+      }));
+    } catch (error) {
+      console.error("Error finding newly due tasks:", error);
+      return [];
+    }
+  }
+  
+  /**
+   * Similar function for time-based tasks, returning the list rather than triggering events
+   */
+  export async function findDueTimeBasedTasks(userId: string): Promise<Array<{task: any, motorcycle: any}>> {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const results = [];
+      
+      // Get all motorcycles for this user
+      const userMotorcycles = await db.query.motorcycles.findMany({
+        where: eq(motorcycles.userId, userId),
+      });
+      
+      for (const motorcycle of userMotorcycles) {
+        // Find tasks that are newly due today (and were not due yesterday)
+        const dueTasks = await db.query.maintenanceTasks.findMany({
+          where: and(
+            eq(maintenanceTasks.motorcycleId, motorcycle.id),
+            eq(maintenanceTasks.archived, false),
+            not(isNull(maintenanceTasks.nextDueDate)),
+            lte(maintenanceTasks.nextDueDate, today),
+            // Only get tasks that weren't already due yesterday
+            gt(maintenanceTasks.nextDueDate, new Date(today.getTime() - 86400000))
+          ),
+        });
+        
+        // Add each task with its motorcycle to the results
+        for (const task of dueTasks) {
+          results.push({ task, motorcycle });
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error("Error finding time-based due tasks:", error);
+      return [];
+    }
+  }
 
 /**
  * Check all users for maintenance tasks that are due

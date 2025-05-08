@@ -14,10 +14,11 @@ import {
   EventType
 } from "../types/integrations";
 
-export async function triggerEvent(userId: string, eventType: EventType, data: any) {
+// Log integration events for debugging
+export async function triggerEvent(userId: string, eventType: string, data: any) {
   try {
-    console.log("Triggering event:", eventType, data);
-
+    console.log(`Triggering event: ${eventType}`, data);
+    
     // Find all active integrations for this user with this event type
     const userIntegrations = await db.query.integrations.findMany({
       where: eq(integrations.userId, userId),
@@ -31,41 +32,58 @@ export async function triggerEvent(userId: string, eventType: EventType, data: a
       }
     });
 
-    // Filter to only active integrations that have this event type
-    const activeIntegrations = userIntegrations
-      .filter(integration => integration.active && integration.events.length > 0);
+    // Filter to only active integrations that have this event type enabled
+    const activeIntegrations = userIntegrations.filter(
+      integration => integration.active && integration.events.length > 0
+    );
 
     if (activeIntegrations.length === 0) {
+      console.log(`No active integrations for ${eventType}`);
       return { success: true, message: "No active integrations for this event type" };
     }
 
+    // For debugging purposes, let's log more information
+    console.log(`Found ${activeIntegrations.length} active integrations for ${eventType}`);
+    
     // Process each integration
     const results = await Promise.all(
       activeIntegrations.map(async (integration) => {
         try {
           // Decrypt configuration
-          const config = JSON.parse(decrypt(integration.config)) as IntegrationConfig;
+          const config = JSON.parse(decrypt(integration.config));
           
           // Use the event template data if available
           const eventTemplate = integration.events[0].templateData 
             ? JSON.parse(integration.events[0].templateData) 
             : null;
 
-          // Prepare the event payload with templates
-          const payload = preparePayload(integration.type as IntegrationType, config, eventType, data, eventTemplate);
+          // Prepare the event payload
+          const payload = {
+            event: eventType,
+            timestamp: new Date().toISOString(),
+            data,
+            ...(eventTemplate || {})
+          };
           
           // Send the event based on integration type
-          const result = await sendIntegrationEvent(integration.type as IntegrationType, config, payload);
+          // This will depend on your specific implementation
+          let result;
+          switch(integration.type) {
+            case 'webhook':
+              result = await sendWebhookEvent(config, payload);
+              break;
+            case 'homeassistant':
+              result = await sendHomeAssistantEvent(config, payload);
+              break;
+            case 'ntfy':
+              result = await sendNtfyEvent(config, payload);
+              break;
+            default:
+              throw new Error(`Unsupported integration type: ${integration.type}`);
+          }
           
-          // Log the event
-          await logIntegrationEvent(
-            integration.id,
-            eventType,
-            result.success ? "success" : "failed",
-            result.message,
-            payload,
-            result.response
-          );
+          // Log the result for debugging
+          console.log(`Integration ${integration.id} result:`, result);
 
           return {
             integrationId: integration.id,
@@ -73,16 +91,7 @@ export async function triggerEvent(userId: string, eventType: EventType, data: a
             message: result.message
           };
         } catch (error) {
-          // Log the error
-          await logIntegrationEvent(
-            integration.id,
-            eventType,
-            "failed",
-            error instanceof Error ? error.message : "Unknown error",
-            { data },
-            null
-          );
-
+          console.error(`Error triggering ${eventType} for integration ${integration.id}:`, error);
           return {
             integrationId: integration.id,
             success: false,
@@ -97,7 +106,7 @@ export async function triggerEvent(userId: string, eventType: EventType, data: a
       results
     };
   } catch (error) {
-    console.error("Error triggering event:", error);
+    console.error(`Error triggering ${eventType} event:`, error);
     return { 
       success: false, 
       message: error instanceof Error ? error.message : "Unknown error"

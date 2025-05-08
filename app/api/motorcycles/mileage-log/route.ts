@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, mileageLogs, maintenanceTasks } from "@/app/lib/db/schema";
 import { triggerEvent } from "@/app/lib/services/integrationService";
-import { checkForNewlyDueTasks } from "@/app/lib/utils/maintenanceUtils";
 import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -73,7 +72,6 @@ export async function POST(request: Request) {
       .where(eq(motorcycles.id, motorcycleId));
 
     // Trigger an event for the mileage update
-    // Trigger an event for the mileage update
     await triggerEvent(session.user.id, "mileage_updated", {
       motorcycle: {
         id: motorcycle.id,
@@ -86,7 +84,6 @@ export async function POST(request: Request) {
       newMileage: newMileage
     });
     
-    // NEW CODE: Check for maintenance tasks that have become due after this mileage update
     // Get all tasks for this motorcycle
     const tasks = await db.query.maintenanceTasks.findMany({
       where: and(
@@ -105,6 +102,9 @@ export async function POST(request: Request) {
     
     // Trigger maintenance_due event for each task that just became due
     for (const task of newlyDueTasks) {
+      // Make sure we're triggering the event with the correct parameters
+      console.log(`Triggering maintenance_due event for task: ${task.name}`);
+      
       await triggerEvent(session.user.id, "maintenance_due", {
         motorcycle: {
           id: motorcycle.id,
@@ -118,16 +118,13 @@ export async function POST(request: Request) {
           name: task.name
         }
       });
+      
       console.log(`Triggered maintenance_due event for task: ${task.name}`);
     }
     
-    // Check for maintenance tasks that have become due after this mileage update
-    await checkForNewlyDueTasks(
-      session.user.id,
-      motorcycleId,
-      previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
-      newMileage
-    );
+    if (newlyDueTasks.length > 0) {
+      console.log(`Triggered ${newlyDueTasks.length} maintenance notifications for motorcycle ${motorcycleId}`);
+    }
 
     return NextResponse.json(logEntry[0], { status: 201 });
   } catch (error) {
