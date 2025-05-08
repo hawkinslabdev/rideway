@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       },
       previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
       newMileage: newMileage
-    });
+    });    
 
     return NextResponse.json(logEntry[0], { status: 201 });
   } catch (error) {

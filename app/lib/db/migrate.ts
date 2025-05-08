@@ -3,7 +3,8 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "./schema";
+import { users, motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs, integrations, integrationEvents, integrationTemplates } from './schema';
+import { encrypt } from '../utils/encryption';
 import { eq, or, isNull, and, not, sql } from "drizzle-orm";
 
 // This will run migrations on the database, creating tables if they don't exist
@@ -703,6 +704,10 @@ async function ensureIntegrationTemplatesTable() {
 
 // Execute all migration steps in sequence
 async function runMigrations() {
+  await db.run(sql`
+    PRAGMA foreign_keys = ON;
+  `);
+
   try {
     console.log("Starting migration process...");
     await ensureColumns();
@@ -715,6 +720,7 @@ async function runMigrations() {
     await ensureIntegrationEventsTable();
     await ensureIntegrationEventLogsTable();
     await ensureIntegrationTemplatesTable();
+    
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);
