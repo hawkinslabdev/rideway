@@ -325,7 +325,84 @@ async function updateMaintenanceTasks() {
   }
 }
 
-// Backfill mileage logs for existing motorcycles with mileage
+async function cleanupDuplicateMileageLogs() {
+  console.log("Cleaning up duplicate mileage logs...");
+  
+  try {
+    // Get all mileage logs
+    const allLogs = await db.query.mileageLogs.findMany({
+      orderBy: (logs, { asc }) => [asc(logs.motorcycleId), asc(logs.date)]
+    });
+    
+    console.log(`Found ${allLogs.length} total mileage logs`);
+    
+    // Group logs by motorcycle and timestamp proximity
+    const motorcycleGroups: Record<string, any[]> = {};
+    
+    // Group logs by motorcycle ID
+    allLogs.forEach(log => {
+      if (!motorcycleGroups[log.motorcycleId]) {
+        motorcycleGroups[log.motorcycleId] = [];
+      }
+      motorcycleGroups[log.motorcycleId].push(log);
+    });
+    
+    let duplicatesRemoved = 0;
+    
+    // Process each motorcycle's logs
+    for (const motorcycleId in motorcycleGroups) {
+      const logs = motorcycleGroups[motorcycleId];
+      const logsToKeep: string[] = [];
+      
+      // Sort logs by date
+      logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      for (let i = 0; i < logs.length; i++) {
+        const currentLog = logs[i];
+        
+        // Always keep the first log
+        if (i === 0) {
+          logsToKeep.push(currentLog.id);
+          continue;
+        }
+        
+        const previousLog = logs[i - 1];
+        
+        // Check if this is potentially a duplicate
+        const isDuplicate = 
+          // Same mileage values
+          (currentLog.previousMileage === previousLog.previousMileage && 
+           currentLog.newMileage === previousLog.newMileage) ||
+          // Log recorded within 5 seconds of previous log
+          (Math.abs(new Date(currentLog.date).getTime() - 
+                   new Date(previousLog.date).getTime()) < 5000);
+        
+        if (!isDuplicate) {
+          logsToKeep.push(currentLog.id);
+        } else {
+          duplicatesRemoved++;
+        }
+      }
+      
+      // Delete logs that aren't in the keep list
+      const logsToDelete = logs.filter(log => !logsToKeep.includes(log.id)).map(log => log.id);
+      
+      if (logsToDelete.length > 0) {
+        for (const logId of logsToDelete) {
+          await db.delete(mileageLogs).where(eq(mileageLogs.id, logId));
+        }
+        console.log(`Removed ${logsToDelete.length} duplicate logs for motorcycle ${motorcycleId}`);
+      }
+    }
+    
+    console.log(`Cleaned up ${duplicatesRemoved} duplicate mileage logs`);
+  } catch (error) {
+    console.error("Error cleaning up duplicate mileage logs:", error);
+    throw error;
+  }
+}
+
+// Update the backfillMileageLogs function to only create logs if needed
 async function backfillMileageLogs() {
   console.log("Backfilling mileage logs for motorcycles with existing mileage...");
   
@@ -342,7 +419,7 @@ async function backfillMileageLogs() {
     for (const motorcycle of motorcyclesWithMileage) {
       // Check if this motorcycle already has any mileage logs
       const existingLogs = await db.query.mileageLogs.findMany({
-        where: eq(mileageLogs.motorcycleId, motorcycle.id) // Fixed: using motorcycle.id instead of record.motorcycleId
+        where: eq(mileageLogs.motorcycleId, motorcycle.id)
       });
       
       if (existingLogs.length === 0 && motorcycle.currentMileage) {
@@ -492,6 +569,7 @@ async function runMigrations() {
     await setupExistingData();
     await backfillMileageLogs();
     await ensureMaintenanceActivity();
+    await cleanupDuplicateMileageLogs();
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);

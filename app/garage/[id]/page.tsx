@@ -256,6 +256,8 @@ export default function MotorcycleDetail() {
       // Store previous mileage for logging
       const previousMileage = motorcycle.currentMileage;
       
+      // Update the motorcycle mileage directly via the API
+      // This will create a single mileage log entry in the backend
       const response = await fetch(`/api/motorcycles/${motorcycle.id}`, {
         method: "PATCH",
         headers: {
@@ -270,6 +272,9 @@ export default function MotorcycleDetail() {
         throw new Error("Failed to update mileage");
       }
       
+      // We no longer need to create a separate mileage log since it's handled in the API
+      // Remove this code to prevent duplicate logs:
+      /* 
       await fetch("/api/motorcycles/mileage-log", {
         method: "POST",
         headers: {
@@ -282,7 +287,8 @@ export default function MotorcycleDetail() {
           notes: `Updated mileage from ${formatDistance(motorcycle.currentMileage || 0)} to ${formatDistance(parseInt(newMileage))}`
         }),
       });
-
+      */
+  
       // Add the mileage update to activity logs with improved detail
       const newLog: ActivityLog = {
         id: `mileage-${Date.now()}`,
@@ -658,7 +664,7 @@ export default function MotorcycleDetail() {
                       currentMileage: motorcycle.currentMileage
                     }))}
                     currentMileage={motorcycle.currentMileage}
-                    milesPerDay={30} // You can adjust this or make it a user setting
+                    milesPerDay={30} // We can adjust this or make it a user setting
                   />
                   
                   <div className="mt-6 flex justify-center">
@@ -794,7 +800,7 @@ export default function MotorcycleDetail() {
               <div className="bg-gray-50 rounded-lg p-6 w-full max-w-lg">
                 <h4 className="font-medium mb-2 text-gray-700">Currently Available</h4>
                 <p className="text-sm text-gray-600 mb-4">
-                  While we're working on a dedicated cost tracking feature, you can still track maintenance 
+                  While we're working on a dedicated cost tracking feature, we can still track maintenance 
                   costs in the maintenance records.
                 </p>
                 <Link

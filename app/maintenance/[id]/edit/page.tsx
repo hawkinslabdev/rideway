@@ -926,7 +926,7 @@ export default function EditMaintenanceTaskPage() {
                     </label>
                     <p className="text-sm text-gray-500">
                       The task will be hidden from your maintenance schedule, but all history and records will be preserved.
-                      You can restore archived tasks later.
+                      We can restore archived tasks later.
                     </p>
                   </div>
                 </div>

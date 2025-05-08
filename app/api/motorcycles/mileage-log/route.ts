@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, mileageLogs } from "@/app/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import { randomUUID } from "crypto";
@@ -26,17 +26,49 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    
+    // Verify motorcycle ownership
+    const motorcycle = await db.query.motorcycles.findFirst({
+      where: and(
+        eq(motorcycles.id, motorcycleId),
+        eq(motorcycles.userId, session.user.id)
+      ),
+    });
+
+    if (!motorcycle) {
+      return NextResponse.json(
+        { error: "Motorcycle not found" },
+        { status: 404 }
+      );
+    }
+    
+    // Check if the mileage is actually different from current mileage
+    // This prevents duplicate entries when this endpoint is called unnecessarily
+    if (motorcycle.currentMileage === newMileage) {
+      return NextResponse.json(
+        { message: "Mileage unchanged, no log entry created" },
+        { status: 200 }
+      );
+    }
 
     // Create a mileage log entry
     const logEntry = await db.insert(mileageLogs).values({
       id: randomUUID(),
       motorcycleId: motorcycleId,
-      previousMileage: previousMileage || null,
+      previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
       newMileage: newMileage,
       date: new Date(),
       notes: notes || `Updated mileage to ${newMileage}`,
       createdAt: new Date(),
     }).returning();
+
+    // Also update the motorcycle's current mileage
+    await db.update(motorcycles)
+      .set({ 
+        currentMileage: newMileage,
+        updatedAt: new Date()
+      })
+      .where(eq(motorcycles.id, motorcycleId));
 
     return NextResponse.json(logEntry[0], { status: 201 });
   } catch (error) {
@@ -71,7 +103,10 @@ export async function GET(request: Request) {
 
     // Verify motorcycle ownership
     const motorcycle = await db.query.motorcycles.findFirst({
-      where: eq(motorcycles.userId, session.user.id),
+      where: and(
+        eq(motorcycles.id, motorcycleId),
+        eq(motorcycles.userId, session.user.id)
+      ),
     });
 
     if (!motorcycle) {

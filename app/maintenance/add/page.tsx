@@ -236,7 +236,7 @@ export default function AddMaintenancePage() {
               <h2 className="text-xl font-semibold">No Motorcycles Found</h2>
             </div>
             <p className="text-gray-600 mb-6">
-              You need to add a motorcycle before you can create maintenance tasks.
+              You need to add a motorcycle before we can create maintenance tasks.
             </p>
             <Link href="/garage/add" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
               <Plus size={16} className="mr-2" />

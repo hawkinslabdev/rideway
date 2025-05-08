@@ -446,7 +446,7 @@ export default function MaintenanceTemplateImporter({
                 Maintenance templates provide predefined sets of maintenance tasks based on common motorcycle maintenance schedules.
               </p>
               <p>
-                When you import a template, you can select which tasks to include. The tasks will be added to your motorcycle's maintenance schedule with appropriate intervals.
+                When you import a template, we can select which tasks to include. The tasks will be added to your motorcycle's maintenance schedule with appropriate intervals.
               </p>
               <p>
                 The system will calculate the next due date and mileage based on your motorcycle's current odometer reading and today's date.
