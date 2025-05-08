@@ -8,6 +8,7 @@ import {
   Check, X, ChevronRight, Edit, RefreshCw,
   AlertCircle, Info, Settings
 } from 'lucide-react';
+import WebhookTemplateEditor from './WebhookTemplateEditor';
 import { IntegrationType, EventType } from '../lib/types/integrations';
 import { toast } from 'react-hot-toast';
 
@@ -1120,11 +1121,13 @@ interface WebhookConfigFormProps {
     onSave: () => void;
   }
   
-  function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegrationModalProps) {
+  function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegrationModalProps): JSX.Element {
     const [integration, setIntegration] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [activeEventType, setActiveEventType] = useState<string | null>(null);
+    const [showTemplateEditor, setShowTemplateEditor] = useState(false);
     
     useEffect(() => {
       fetchIntegration();
@@ -1151,6 +1154,44 @@ interface WebhookConfigFormProps {
       }
     };
     
+    const toggleUseCustomPayload = (eventType: string) => {
+      setIntegration((prev: typeof integration) => {
+        // Find the event to update
+        const updatedEvents = prev.events.map((event: any) => 
+          event.eventType === eventType 
+            ? { 
+                ...event, 
+                useCustomPayload: !event.useCustomPayload
+              } 
+            : event
+        );
+        
+        return {
+          ...prev,
+          events: updatedEvents
+        };
+      });
+
+      const handleTemplateChange = (template: string) => {
+        if (!activeEventType) return;
+        
+        setIntegration((prev: typeof integration) => {
+          // Find the event to update
+          const updatedEvents = prev.events.map((event: any) => 
+            event.eventType === activeEventType 
+              ? { 
+                  ...event, 
+                  payloadTemplate: template
+                } 
+              : event
+          );
+          
+          return {
+            ...prev,
+            events: updatedEvents
+          };
+        });
+
     const handleSave = async () => {
       try {
         setIsSaving(true);
@@ -1375,3 +1416,4 @@ interface WebhookConfigFormProps {
       </div>
     );
   }
+  

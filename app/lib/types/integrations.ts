@@ -17,6 +17,8 @@ export interface WebhookIntegrationConfig extends BaseIntegrationConfig {
     password?: string;
     token?: string;
   };
+  payloadTemplate?: string;
+  useCustomPayload?: boolean; 
 }
 
 export interface HomeAssistantIntegrationConfig extends BaseIntegrationConfig {

@@ -52,21 +52,31 @@ export async function triggerEvent(userId: string, eventType: string, data: any)
           // Decrypt configuration
           const config = JSON.parse(decrypt(integration.config));
           
-          // Use the event template data if available
-          const eventTemplate = integration.events[0].templateData 
-            ? JSON.parse(integration.events[0].templateData) 
-            : null;
-
-          // Prepare the event payload
-          const payload = {
+          // Get the event template data and payload template if available
+          const event = integration.events[0];
+          let payload = {
             event: eventType,
             timestamp: new Date().toISOString(),
-            data,
-            ...(eventTemplate || {})
+            ...data
           };
           
+          // Apply event template data if available
+          if (event.templateData) {
+            const template = JSON.parse(event.templateData);
+            payload = {
+              ...payload,
+              ...template
+            };
+          }
+          
+          // Apply custom payload template for webhooks if enabled
+          if (integration.type === 'webhook' && 'payloadTemplate' in event && event.payloadTemplate) {
+            if (typeof event.payloadTemplate === 'string') {
+              payload = processTemplate(event.payloadTemplate, payload);
+            }
+          }
+          
           // Send the event based on integration type
-          // This will depend on your specific implementation
           let result;
           switch(integration.type) {
             case 'webhook':
@@ -131,8 +141,7 @@ function preparePayload(
   // Apply template transformations if provided
   let payload = { ...basePayload };
   if (template) {
-    // Apply template-specific transformations
-    // This could be expanded for more complex templating
+    // Apply template-specific transformations, which could be expanded for more complex templating
     payload = { ...payload, ...template };
   }
 
@@ -168,6 +177,57 @@ function preparePayload(
     
     default:
       return payload;
+  }
+}
+
+function processTemplate(template: string, data: any): any {
+  try {
+    // If template is not a string, return as is
+    if (typeof template !== 'string') {
+      return data;
+    }
+    
+    let processedTemplate = template;
+    
+    // Find all {{variable}} patterns
+    const variablePattern = /\{\{([^}]+)\}\}/g;
+    let match;
+    
+    while ((match = variablePattern.exec(template)) !== null) {
+      const fullMatch = match[0];
+      const variablePath = match[1].trim();
+      
+      // Navigate the data object using the path
+      const pathParts = variablePath.split('.');
+      let value = { ...data };
+      
+      for (const part of pathParts) {
+        if (value === undefined || value === null) break;
+        value = value[part];
+      }
+      
+      // Replace the variable with its value
+      if (value !== undefined && value !== null) {
+        const stringValue = typeof value === 'object' 
+          ? JSON.stringify(value)
+          : String(value);
+          
+        processedTemplate = processedTemplate.replace(fullMatch, stringValue);
+      } else {
+        // If value not found, replace with empty string
+        processedTemplate = processedTemplate.replace(fullMatch, '');
+      }
+    }
+    
+    // Try to parse the result as JSON, fall back to string if not valid JSON
+    try {
+      return JSON.parse(processedTemplate);
+    } catch (e) {
+      return processedTemplate;
+    }
+  } catch (error) {
+    console.error("Error processing template:", error);
+    return data; // Fall back to the original data
   }
 }
 
@@ -218,6 +278,11 @@ async function sendWebhookEvent(
   payload: any
 ): Promise<{ success: boolean, message: string, response?: any }> {
   try {
+    // Process template if custom payload is enabled
+    const finalPayload = config.useCustomPayload && config.payloadTemplate 
+      ? processTemplate(config.payloadTemplate, payload)
+      : payload;
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...config.headers
@@ -247,7 +312,7 @@ async function sendWebhookEvent(
     const response = await fetch(config.url, {
       method: config.method,
       headers,
-      body: ['GET', 'HEAD'].includes(config.method) ? undefined : JSON.stringify(payload)
+      body: ['GET', 'HEAD'].includes(config.method) ? undefined : JSON.stringify(finalPayload)
     });
 
     if (!response.ok) {

@@ -623,7 +623,7 @@ async function ensureIntegrationEventsTable() {
     ).all().length > 0;
     
     if (!tableExists) {
-      // Create the table if it doesn't exist
+      // Create the table with templateData support
       db.$client.prepare(`
         CREATE TABLE integration_events (
           id TEXT PRIMARY KEY,
@@ -631,11 +631,21 @@ async function ensureIntegrationEventsTable() {
           eventType TEXT NOT NULL,
           enabled INTEGER DEFAULT 1,
           templateData TEXT,
+          payloadTemplate TEXT,
           createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
       `).run();
       console.log("Created integration_events table");
+    } else {
+      // Check if the payloadTemplate column exists
+      const columns = db.$client.prepare("PRAGMA table_info(integration_events)").all();
+      const columnNames = columns.map((col: any) => col.name);
+      
+      if (!columnNames.includes("payloadTemplate")) {
+        db.$client.prepare("ALTER TABLE integration_events ADD COLUMN payloadTemplate TEXT").run();
+        console.log("Added 'payloadTemplate' column to integration_events table");
+      }
     }
   } catch (error) {
     console.error("Error ensuring integration_events table:", error);
@@ -644,7 +654,6 @@ async function ensureIntegrationEventsTable() {
 }
 
 // Ensure the integration_event_logs table is created
-
 async function ensureIntegrationEventLogsTable() {
   console.log("Ensuring integration_event_logs table exists...");
   
