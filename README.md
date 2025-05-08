@@ -100,13 +100,45 @@ The setup wizard will walk you through creating your account and adding your fir
 - Import your data on any device running Rideway
 - No cloud subscriptions or vendor lock-in
 
-## User (re)activation
+## User Management & Password Reset
 
-#### Generate a password reset token for a user
-docker-compose exec app npx ts-node app/scripts/reset-password.ts generate user@example.com
+In Rideway, you can reset a password through the `Settings` page. If a user has lost their password, a CLI-based admin tool is available for managing user accounts without requiring external integrations. Perfect for self-hosted environments!
 
-#### Reset a password using a token
-docker-compose exec app npx ts-node app/scripts/reset-password.ts reset <token> new_password
+### Password Reset Process
+
+#### Generate a reset token for a user
+```bash
+# Using Node.js directly
+node app/scripts/reset-password.js generate john@example.com
+
+# In Docker environment
+docker-compose exec app node app/scripts/reset-password.js generate john@example.com
+```
+
+This will generate a password reset token and provide:
+- A URL that can be shared with the user (they can reset their password through the web interface)
+- Instructions for resetting via command line
+
+You can share the URL you've received from the CLI with whomever has lost their password:
+
+```
+https://your-website.com/auth/reset-password/<token-here>
+```
+
+#### Reset a password directly via command line
+```bash
+# Using Node.js directly
+node app/scripts/reset-password.js reset <TOKEN> "new-secure-password"
+
+# In Docker environment
+docker-compose exec app node app/scripts/reset-password.js reset <TOKEN> "new-secure-password"
+```
+
+
+Each token:
+- Is unique and cryptographically secure
+- Expires after 24 hours
+- Can only be used once
 
 ## Screenshots
 
