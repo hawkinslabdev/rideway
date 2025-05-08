@@ -549,15 +549,33 @@ async function ensureMaintenanceActivity() {
   }
 }
 
-// Helper function to get task name
-async function getTaskName(taskId: string): Promise<string> {
+// Ensure the password_reset_tokens table exists
+async function ensurePasswordResetTable() {
+  console.log("Ensuring password_reset_tokens table exists...");
+  
   try {
-    const task = await db.query.maintenanceTasks.findFirst({
-      where: eq(maintenanceTasks.id, taskId)
-    });
-    return task ? task.name : "Maintenance";
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='password_reset_tokens'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE password_reset_tokens (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token TEXT NOT NULL,
+          expires_at INTEGER NOT NULL,
+          used INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created password_reset_tokens table");
+    }
   } catch (error) {
-    return "Maintenance";
+    console.error("Error ensuring password_reset_tokens table:", error);
+    throw error;
   }
 }
 
@@ -570,6 +588,7 @@ async function runMigrations() {
     await backfillMileageLogs();
     await ensureMaintenanceActivity();
     await cleanupDuplicateMileageLogs();
+    await ensurePasswordResetTable();
     console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration process failed:", error);

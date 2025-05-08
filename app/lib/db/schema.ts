@@ -78,6 +78,15 @@ export const mileageLogs = sqliteTable("mileage_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  used: integer("used", { mode: "boolean" }).default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
+});
+
 // Define relationships
 export const motorcyclesRelations = relations(motorcycles, ({ one, many }) => ({
   user: one(users, {

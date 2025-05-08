@@ -100,6 +100,14 @@ The setup wizard will walk you through creating your account and adding your fir
 - Import your data on any device running Rideway
 - No cloud subscriptions or vendor lock-in
 
+## User (re)activation
+
+#### Generate a password reset token for a user
+docker-compose exec app npx ts-node app/scripts/reset-password.ts generate user@example.com
+
+#### Reset a password using a token
+docker-compose exec app npx ts-node app/scripts/reset-password.ts reset <token> new_password
+
 ## Screenshots
 
 <h5 align="center">Login</h5>

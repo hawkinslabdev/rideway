@@ -959,3 +959,4 @@ export default function Dashboard() {
       </main>
     </ClientLayout>
   );
+}

@@ -1,16 +1,30 @@
-// middleware.ts
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
   function middleware(req) {
-    // Allow access to setup page without authentication
-    if (req.nextUrl.pathname === "/setup") {
+    // Define public paths that don't require authentication
+    const publicPaths = [
+      "/setup",
+      "/auth/signin",
+      "/auth/forgot-password",
+    ];
+    
+    // Allow access to password reset page with token
+    if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
+      return NextResponse.next();
+    }
+    
+    // Check if the current path is in the public paths list
+    const isPublicPath = publicPaths.includes(req.nextUrl.pathname);
+    
+    // Allow access to public paths without authentication
+    if (isPublicPath) {
       return NextResponse.next();
     }
 
-    // Redirect to setup if no user exists and not already on signin page
-    if (!req.nextauth.token && req.nextUrl.pathname !== "/auth/signin") {
+    // Redirect to setup if no user exists and not already on a public page
+    if (!req.nextauth.token) {
       return NextResponse.redirect(new URL("/setup", req.url));
     }
 
@@ -28,14 +42,31 @@ export default withAuth(
     },
     callbacks: {
       authorized: ({ token, req }) => {
-        // Allow access to public pages
+        // Check if this is a public API route
         if (
-          req.nextUrl.pathname === "/setup" ||
-          req.nextUrl.pathname === "/auth/signin" ||
-          req.nextUrl.pathname.startsWith("/api/auth")
+          req.nextUrl.pathname.startsWith("/api/auth/forgot-password") ||
+          req.nextUrl.pathname.startsWith("/api/auth/validate-token") ||
+          req.nextUrl.pathname.startsWith("/api/auth/reset-password")
         ) {
           return true;
         }
+        if (req.nextUrl.pathname.startsWith("/api/admin/reset-password")) {
+          return true;
+        }
+        // Check if this is a password reset page with token
+        if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
+          return true;
+        }
+        
+        // Check if this is a public page
+        if (
+          req.nextUrl.pathname === "/setup" ||
+          req.nextUrl.pathname === "/auth/signin" ||
+          req.nextUrl.pathname === "/auth/forgot-password"
+        ) {
+          return true;
+        }
+        
         // Require authentication for all other pages
         return !!token;
       },
@@ -51,9 +82,11 @@ export const config = {
     "/history/:path*",
     "/profile/:path*",
     "/settings/:path*",
+    "/auth/:path*", // Added to match auth routes
     "/api/dashboard/:path*",
     "/api/motorcycles/:path*",
     "/api/user/:path*",
+    "/api/auth/:path*", // Added to match auth API routes
     // Prevent static/public files from triggering middleware
     "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
