@@ -12,8 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:init": "node -r esbuild-register scripts/init-db.ts",
-    "db:setup": "npm run db:push && npm run db:init",
-    "db:migrate:maintenance": "node -r esbuild-register scripts/migrate-maintenance-data.ts"
+    "db:setup": "npm run db:push && npm run db:init"
   },
   "dependencies": {
     "@libsql/client": "^0.15.4",
