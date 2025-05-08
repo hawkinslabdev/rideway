@@ -50,6 +50,7 @@ export const maintenanceTasks = sqliteTable("maintenance_tasks", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(new Date()),
 });
 
+
 // Maintenance records table
 export const maintenanceRecords = sqliteTable("maintenance_records", {
   id: text("id").primaryKey(),

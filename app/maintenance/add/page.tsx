@@ -4,10 +4,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ClientLayout from "../../components/ClientLayout";
+import MileageTrackingInfoModal from "../../components/MileageTrackingInfoModal";
 import Link from "next/link";
 import { ArrowLeft, Plus, AlertCircle, Info } from "lucide-react";
 import { useSettings } from "../../contexts/SettingsContext";
 import { DistanceUtil } from "../../lib/utils/distance";
+
 
 interface Motorcycle {
   id: string;
@@ -31,6 +33,7 @@ export default function AddMaintenancePage() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [intervalBase, setIntervalBase] = useState<'current' | 'zero'>('current');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showMileageInfoModal, setShowMileageInfoModal] = useState(false);
   
   // Track the type of mileage entry
   const [mileageType, setMileageType] = useState<'interval' | 'absolute'>('interval');
@@ -44,6 +47,7 @@ export default function AddMaintenancePage() {
     intervalDays: "",
     priority: "medium",
     isRecurring: true,
+    intervalBase: "current", // Add intervalBase property
   });
 
   useEffect(() => {
@@ -448,10 +452,18 @@ export default function AddMaintenancePage() {
                         )}
                         
                         {/* Advanced options - hidden by default */}
-                        {showAdvancedOptions && (
+                        {mileageType === 'interval' && showAdvancedOptions && (
                           <div className="mt-3 pt-3 border-t border-gray-200">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Advanced: Interval Calculation Method
+                            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                              <span>Advanced: Interval Calculation Method</span>
+                              <button 
+                                type="button" 
+                                onClick={() => setShowMileageInfoModal(true)}
+                                className="text-blue-600 hover:text-blue-800 inline-flex items-center"
+                              >
+                                <Info size={14} className="mr-1" />
+                                <span className="text-xs">How this works</span>
+                              </button>
                             </label>
                             <div className="flex gap-4">
                               <div className="flex items-center">
@@ -459,8 +471,8 @@ export default function AddMaintenancePage() {
                                   id="current-based"
                                   type="radio"
                                   name="intervalBase"
-                                  checked={intervalBase === 'current'}
-                                  onChange={() => setIntervalBase('current')}
+                                  checked={formData.intervalBase === 'current'}
+                                  onChange={() => setFormData(prev => ({ ...prev, intervalBase: 'current' }))}
                                   className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                                 />
                                 <label htmlFor="current-based" className="ml-2 block text-sm text-gray-700">
@@ -472,8 +484,8 @@ export default function AddMaintenancePage() {
                                   id="zero-based"
                                   type="radio"
                                   name="intervalBase"
-                                  checked={intervalBase === 'zero'}
-                                  onChange={() => setIntervalBase('zero')}
+                                  checked={formData.intervalBase === 'zero'}
+                                  onChange={() => setFormData(prev => ({ ...prev, intervalBase: 'zero' }))}
                                   className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                                 />
                                 <label htmlFor="zero-based" className="ml-2 block text-sm text-gray-700">
@@ -483,7 +495,7 @@ export default function AddMaintenancePage() {
                             </div>
                             
                             <div className="mt-2 p-2 rounded bg-gray-50 text-xs text-gray-600">
-                              {intervalBase === 'current' ? (
+                              {formData.intervalBase === 'current' ? (
                                 <>
                                   <p className="mb-1"><strong>From Current Mileage:</strong> Counts forward from your current odometer reading.</p>
                                   <p>Example: If current mileage is 5,000 and interval is 3,000, next service due at 8,000.</p>
@@ -497,6 +509,7 @@ export default function AddMaintenancePage() {
                             </div>
                           </div>
                         )}
+
                       </div>
                     )}
                     
@@ -630,6 +643,11 @@ export default function AddMaintenancePage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Mileage Tracking Info Modal */}
+        {showMileageInfoModal && (
+          <MileageTrackingInfoModal onClose={() => setShowMileageInfoModal(false)} />
         )}
       </main>
     </ClientLayout>

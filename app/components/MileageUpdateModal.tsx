@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { Bike, X, Gauge, CheckCircle } from "lucide-react";
+import { Bike, X, Gauge, CheckCircle, Info } from "lucide-react";
 import { useSettings } from "../contexts/SettingsContext";
+import MileageTrackingInfoModal from "./MileageTrackingInfoModal";
 
 interface Motorcycle {
   id: string;
@@ -29,6 +30,7 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
   const [newMileage, setNewMileage] = useState("");
   const [updatingMileage, setUpdatingMileage] = useState(false);
   const [error, setError] = useState("");
+  const [showMileageInfoModal, setShowMileageInfoModal] = useState(false);
   
   useEffect(() => {
     const fetchMotorcycles = async () => {
@@ -47,7 +49,7 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         setMotorcycles(ownedMotorcycles);
         
         // Select default motorcycle if available
-        const defaultMotorcycle = ownedMotorcycles.find(m => m.isDefault) || ownedMotorcycles[0];
+        const defaultMotorcycle = ownedMotorcycles.find((m: Motorcycle) => m.isDefault) || ownedMotorcycles[0];
         if (defaultMotorcycle) {
           setSelectedMotorcycle(defaultMotorcycle);
           setNewMileage(defaultMotorcycle.currentMileage?.toString() || "");
@@ -231,9 +233,17 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
             <form onSubmit={handleMileageUpdate}>
               {/* Mileage Input */}
               <div className="mb-6">
-                <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Mileage
-                </label>
+              <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                <span>Current Mileage</span>
+                <button
+                  type="button"
+                  onClick={() => setShowMileageInfoModal(true)}
+                  className="text-blue-600 hover:text-blue-800 text-xs flex items-center"
+                >
+                  <Info size={14} className="mr-1" />
+                  How this affects maintenance
+                </button>
+              </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <input
                     type="number"
@@ -293,6 +303,11 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
           </>
         )}
       </div>
+      
+      {/* Mileage Tracking Info Modal */}
+      {showMileageInfoModal && (
+        <MileageTrackingInfoModal onClose={() => setShowMileageInfoModal(false)} />
+      )}
     </div>
   );
 }
