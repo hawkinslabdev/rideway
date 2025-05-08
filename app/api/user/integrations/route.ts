@@ -97,9 +97,9 @@ export async function POST(request: Request) {
         integrationId: newIntegration[0].id,
         eventType: event.eventType,
         enabled: event.enabled ?? true,
-        templateData: event.templateData ? JSON.stringify(event.templateData) : null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        templateData: event.templateData ? JSON.stringify(event.templateData) : null, // Ensure templateData is serialized
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }));
 
       await db.insert(integrationEvents).values(eventEntries);

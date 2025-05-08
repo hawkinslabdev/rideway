@@ -644,6 +644,7 @@ async function ensureIntegrationEventsTable() {
 }
 
 // Ensure the integration_event_logs table is created
+
 async function ensureIntegrationEventLogsTable() {
   console.log("Ensuring integration_event_logs table exists...");
   
@@ -661,10 +662,33 @@ async function ensureIntegrationEventLogsTable() {
           integrationId TEXT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
           eventType TEXT NOT NULL,
           status TEXT NOT NULL,
+          statusMessage TEXT,
+          requestData TEXT,
+          responseData TEXT,
           createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
       `).run();
       console.log("Created integration_event_logs table");
+    } else {
+      // Check if the table needs updating with new columns
+      const columns = db.$client.prepare("PRAGMA table_info(integration_event_logs)").all();
+      const columnNames = columns.map((col: any) => col.name);
+      
+      // Add missing columns if needed
+      if (!columnNames.includes("statusMessage")) {
+        db.$client.prepare("ALTER TABLE integration_event_logs ADD COLUMN statusMessage TEXT").run();
+        console.log("Added 'statusMessage' column to integration_event_logs table");
+      }
+      
+      if (!columnNames.includes("requestData")) {
+        db.$client.prepare("ALTER TABLE integration_event_logs ADD COLUMN requestData TEXT").run();
+        console.log("Added 'requestData' column to integration_event_logs table");
+      }
+      
+      if (!columnNames.includes("responseData")) {
+        db.$client.prepare("ALTER TABLE integration_event_logs ADD COLUMN responseData TEXT").run();
+        console.log("Added 'responseData' column to integration_event_logs table");
+      }
     }
   } catch (error) {
     console.error("Error ensuring integration_event_logs table:", error);
@@ -702,6 +726,105 @@ async function ensureIntegrationTemplatesTable() {
   }
 }
 
+// File: app/lib/db/migrate.ts
+// Add this function to populate the integration templates table
+
+async function setupDefaultIntegrationTemplates() {
+  console.log("Setting up default integration templates...");
+  
+  try {
+    // Check if there are already templates in the database
+    const existingTemplates = await db.query.integrationTemplates.findMany({
+      limit: 1
+    });
+    
+    if (existingTemplates.length > 0) {
+      console.log("Integration templates already exist, skipping");
+      return;
+    }
+    
+    // Default templates
+    const defaultTemplates = [
+      {
+        id: randomUUID(),
+        name: "Generic Webhook",
+        description: "Send notifications to any webhook service",
+        type: "webhook",
+        defaultConfig: JSON.stringify({
+          url: "",
+          method: "POST",
+          headers: {},
+          authentication: { type: "none" }
+        }),
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: randomUUID(),
+        name: "Home Assistant",
+        description: "Send events to Home Assistant automation platform",
+        type: "homeassistant",
+        defaultConfig: JSON.stringify({
+          baseUrl: "http://homeassistant.local:8123",
+          longLivedToken: "",
+          entityId: ""
+        }),
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: randomUUID(),
+        name: "Ntfy Notifications",
+        description: "Send push notifications via ntfy.sh",
+        type: "ntfy",
+        defaultConfig: JSON.stringify({
+          topic: "rideway-notifications",
+          server: "https://ntfy.sh",
+          priority: "default",
+          authorization: { type: "none" }
+        }),
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: randomUUID(),
+        name: "Discord Webhook",
+        description: "Send notifications to Discord channels",
+        type: "webhook",
+        defaultConfig: JSON.stringify({
+          url: "",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          authentication: { type: "none" }
+        }),
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: randomUUID(),
+        name: "Slack Webhook",
+        description: "Send notifications to Slack channels",
+        type: "webhook",
+        defaultConfig: JSON.stringify({
+          url: "",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          authentication: { type: "none" }
+        }),
+        createdAt: new Date().toISOString()
+      }
+    ];
+    
+    // Insert the templates
+    await db.insert(integrationTemplates).values(defaultTemplates);
+    
+    console.log(`Created ${defaultTemplates.length} default integration templates`);
+  } catch (error) {
+    console.error("Error setting up default integration templates:", error);
+    throw error;
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   await db.run(sql`
@@ -720,6 +843,7 @@ async function runMigrations() {
     await ensureIntegrationEventsTable();
     await ensureIntegrationEventLogsTable();
     await ensureIntegrationTemplatesTable();
+    await setupDefaultIntegrationTemplates();
     
     console.log("All migrations completed successfully!");
   } catch (error) {

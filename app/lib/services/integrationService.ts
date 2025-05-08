@@ -16,6 +16,8 @@ import {
 
 export async function triggerEvent(userId: string, eventType: EventType, data: any) {
   try {
+    console.log("Triggering event:", eventType, data);
+
     // Find all active integrations for this user with this event type
     const userIntegrations = await db.query.integrations.findMany({
       where: eq(integrations.userId, userId),
