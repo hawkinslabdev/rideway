@@ -26,18 +26,20 @@ export async function POST(request: Request) {
       });
     }
     
-    // Log the request to the console - in a real application, this could send
-    // a notification to administrators through a different channel
+    // Log the request to the console with clear instructions
     console.log('\n---------------------------------------------');
-    console.log('PASSWORD RESET REQUEST');
+    console.log('📧 PASSWORD RESET REQUEST RECEIVED');
+    console.log('---------------------------------------------');
     console.log(`User: ${user.name} (${user.email})`);
-    console.log(`ID: ${user.id}`);
-    console.log(`Time: ${new Date().toISOString()}`);
-    console.log('\nTo generate a reset token, run:');
-    console.log(`docker-compose exec app npx ts-node app/scripts/reset-password.ts generate ${user.email}`);
+    console.log(`User ID: ${user.id}`);
+    console.log(`Requested: ${new Date().toLocaleString()}`);
+    console.log('\n🔑 To generate a reset token, run:');
+    console.log(`node app/scripts/reset-password.js generate ${user.email}`);
+    console.log('\nOr in Docker environment:');
+    console.log(`docker-compose exec app node app/scripts/reset-password.js generate ${user.email}`);
     console.log('---------------------------------------------\n');
-    
-    return NextResponse.json({ 
+   
+   return NextResponse.json({ 
       message: "If your email exists in our system, an administrator will be notified" 
     });
   } catch (error) {
