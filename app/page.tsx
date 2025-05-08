@@ -663,7 +663,7 @@ export default function Dashboard() {
                   {/* Maintenance Alert Card */}
                   {dashboardData.overdueCount > 0 ? (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                      <div className="flex">
+                      <div className="flex items-start">
                         <div className="bg-red-100 rounded-full p-2 flex-shrink-0 mr-4">
                           <AlertTriangle size={22} className="text-red-600" />
                         </div>

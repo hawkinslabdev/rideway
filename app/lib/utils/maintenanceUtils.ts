@@ -1,9 +1,10 @@
-// File: app/lib/utils/maintenanceUtils.ts
+// app/lib/utils/maintenanceUtils.ts
 
 import { triggerEvent } from "../services/integrationService";
 import { db } from "../db/db";
 import { maintenanceTasks, motorcycles, users } from "../db/schema";
 import { eq, and, lte, gt, isNull, ne, not } from "drizzle-orm";
+import { canNotifyForTask } from "./notificationTracker";
 
 /**
  * Checks for maintenance tasks that became due after a mileage update
@@ -53,7 +54,14 @@ export async function checkForNewlyDueTasks(
     console.log(`Found ${newlyDueTasks.length} newly due tasks`);
     
     // Trigger maintenance_due event for each task that just became due
+    let notificationsTriggered = 0;
     for (const task of newlyDueTasks) {
+      // Check if we've recently notified for this task to prevent duplicate notifications
+      if (!canNotifyForTask(task.id)) {
+        console.log(`Skipping notification for task ${task.id} (${task.name}) - recently notified`);
+        continue;
+      }
+      
       console.log(`Triggering maintenance_due event for task: ${task.name} (${task.id})`);
       
       await triggerEvent(userId, "maintenance_due", {
@@ -70,10 +78,11 @@ export async function checkForNewlyDueTasks(
         }
       });
       
+      notificationsTriggered++;
       console.log(`Successfully triggered maintenance_due event for task: ${task.name}`);
     }
     
-    return newlyDueTasks.length;
+    return notificationsTriggered;
   } catch (error) {
     console.error("Error checking for newly due tasks:", error);
     return 0;
@@ -112,6 +121,12 @@ export async function checkForDueTimeBasedTasks(userId: string): Promise<number>
       
       // Trigger maintenance_due event for each task
       for (const task of dueTasks) {
+        // Check if we've recently notified for this task
+        if (!canNotifyForTask(task.id)) {
+          console.log(`Skipping notification for time-based task ${task.id} (${task.name}) - recently notified`);
+          continue;
+        }
+        
         await triggerEvent(userId, "maintenance_due", {
           motorcycle: {
             id: motorcycle.id,

@@ -1,4 +1,4 @@
-// File: app/lib/utils/encryption.ts
+// app/lib/utils/encryption.ts
 import crypto from 'crypto';
 
 // Get encryption key from environment variable or use a default for development

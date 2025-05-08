@@ -1,4 +1,4 @@
-// File: app/api/user/integrations/templates/route.ts
+// app/api/user/integrations/templates/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";

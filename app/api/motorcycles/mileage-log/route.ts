@@ -7,6 +7,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import { randomUUID } from "crypto";
+import { canNotifyForTask } from "@/app/lib/utils/notificationTracker";
 
 export async function POST(request: Request) {
   try {
@@ -98,10 +99,17 @@ export async function POST(request: Request) {
       return task.nextDueOdometer !== null && 
              task.nextDueOdometer <= newMileage &&
              (previousMileage === null || task.nextDueOdometer > previousMileage);
-    });
+    });    
     
     // Trigger maintenance_due event for each task that just became due
+    let notificationsTriggered = 0;
     for (const task of newlyDueTasks) {
+      // Check if we've recently notified for this task
+      if (!canNotifyForTask(task.id)) {
+        console.log(`Skipping duplicate notification for task ${task.id} (${task.name})`);
+        continue;
+      }
+      
       // Make sure we're triggering the event with the correct parameters
       console.log(`Triggering maintenance_due event for task: ${task.name}`);
       
@@ -119,11 +127,12 @@ export async function POST(request: Request) {
         }
       });
       
+      notificationsTriggered++;
       console.log(`Triggered maintenance_due event for task: ${task.name}`);
     }
-    
-    if (newlyDueTasks.length > 0) {
-      console.log(`Triggered ${newlyDueTasks.length} maintenance notifications for motorcycle ${motorcycleId}`);
+
+    if (notificationsTriggered > 0) {
+      console.log(`Triggered ${notificationsTriggered} maintenance notifications for motorcycle ${motorcycleId}`);
     }
 
     return NextResponse.json(logEntry[0], { status: 201 });

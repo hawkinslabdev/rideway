@@ -1,4 +1,4 @@
-// File: app/lib/utils/testIntegration.ts
+// app/lib/utils/testIntegration.ts
 
 import { triggerEvent } from "../services/integrationService";
 

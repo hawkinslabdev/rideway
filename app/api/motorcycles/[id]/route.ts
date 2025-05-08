@@ -4,6 +4,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { db } from "@/app/lib/db/db";
 import { triggerEvent } from "@/app/lib/services/integrationService";
+import { canNotifyForTask } from "@/app/lib/utils/notificationTracker";
 import { motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs } from "@/app/lib/db/schema";
 import { checkForNewlyDueTasks, updateMaintenanceTasksAfterMileageChange } from "@/app/lib/utils/maintenanceUtils";
 import { eq, and } from "drizzle-orm";
@@ -381,6 +382,12 @@ export async function PATCH(
           
           // Trigger maintenance_due event for each task that just became due
           for (const task of newlyDueTasks) {
+            // Check if we've recently notified for this task
+            if (!canNotifyForTask(task.id)) {
+              console.log(`Skipping notification for task ${task.id} (${task.name}) - recently notified`);
+              continue;
+            }
+            
             await triggerEvent(session.user.id, "maintenance_due", {
               motorcycle: {
                 id: motorcycle.id,
@@ -396,7 +403,7 @@ export async function PATCH(
             });
             console.log(`Triggered maintenance_due event for task: ${task.name}`);
           }
-        }
+        }          
       }
     }
 

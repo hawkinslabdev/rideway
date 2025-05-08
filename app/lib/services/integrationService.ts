@@ -1,4 +1,4 @@
-// File: app/lib/services/integrationService.ts
+// app/lib/services/integrationService.ts
 
 import { db } from "../db/db";
 import { integrations, integrationEvents, integrationEventLogs } from "../db/schema";

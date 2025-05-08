@@ -1,4 +1,4 @@
-// File: app/components/ScheduledMaintenanceCheck.tsx
+// app/components/ScheduledMaintenanceCheck.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";

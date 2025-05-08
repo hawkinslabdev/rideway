@@ -1,4 +1,4 @@
-// File: app/lib/types/next-auth.d.ts
+// app/lib/types/next-auth.d.ts
 
 import { DefaultSession } from "next-auth";
 

@@ -1,4 +1,4 @@
-// File: app/components/MileageTrackingInfoModal.tsx
+// app/components/MileageTrackingInfoModal.tsx
 "use client";
 
 import React from 'react';

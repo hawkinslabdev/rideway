@@ -726,7 +726,7 @@ async function ensureIntegrationTemplatesTable() {
   }
 }
 
-// File: app/lib/db/migrate.ts
+// app/lib/db/migrate.ts
 // Add this function to populate the integration templates table
 
 async function setupDefaultIntegrationTemplates() {

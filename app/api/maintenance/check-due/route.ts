@@ -1,8 +1,9 @@
-// File: app/api/maintenance/check-due/route.ts
+// app/api/maintenance/check-due/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, maintenanceTasks, users } from "@/app/lib/db/schema";
 import { triggerEvent } from "@/app/lib/services/integrationService";
+import { canNotifyForTask } from "@/app/lib/utils/notificationTracker";
 import { eq, and, lte, gt, isNull, not } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
@@ -61,6 +62,12 @@ export async function POST(request: Request) {
       
       // Trigger maintenance_due event for each task
       for (const task of dueTasks) {
+        // Check if we've recently notified for this task
+        if (!canNotifyForTask(task.id)) {
+          console.log(`Skipping notification for task ${task.id} (${task.name}) - recently notified`);
+          continue;
+        }
+        
         await triggerEvent(session.user.id, "maintenance_due", {
           motorcycle: {
             id: motorcycle.id,
@@ -76,7 +83,7 @@ export async function POST(request: Request) {
         });
         notificationsTriggered++;
         console.log(`Triggered maintenance_due event for time-based task: ${task.name}`);
-      }
+      }      
     }
     
     return NextResponse.json({

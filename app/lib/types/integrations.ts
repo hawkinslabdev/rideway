@@ -1,4 +1,4 @@
-// File: app/lib/types/integrations.ts
+// app/lib/types/integrations.ts
 
 export type IntegrationType = "webhook" | "homeassistant" | "ntfy";
 

@@ -1,4 +1,4 @@
-// File: app/components/IntegrationsManager.tsx
+// app/components/IntegrationsManager.tsx
 
 "use client";
 
