@@ -4,9 +4,9 @@
 
 > NOTE: This project was 100% vibe coded. It was built to meet our own needs for a feature-rich, user-friendly open source motorcycle maintenance app. It's still **work in progress**. Feel free to collaborate to bring the first version live.
 
-<img src=".github/images/screenshot_1.png" align="center" />
-
 Hey fellow riders! Rideway is your digital garage buddy that helps you stay on top of maintenance for all your motorcycles. Whether you're wrenching on a vintage café racer or maintaining a fleet of modern sport bikes, Rideway's got your back.
+
+<img src=".github/images/screenshot_1.png" align="center" />
 
 <h4 align="center"><a href="#screenshots">SCREENSHOTS</a> | <a href="#">DEMO</a></h4>
 
@@ -32,44 +32,97 @@ We use modern web tech that just works:
 
 ## Deployment
 
-### Heroku one-click deploy
+Rideway is built to be easy to deploy with minimal setup. Choose your preferred method:
 
-Deploying Rideway to Heroku is a breeze. It's as simple as clicking this button:
+### Option 1: Docker (Recommended)
+
+The simplest way to run Rideway is with Docker:
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -v rideway-data:/app/data \
+  -v rideway-uploads:/app/public/uploads \
+  -e NEXTAUTH_URL=http://localhost:3000 \
+  -e NEXTAUTH_SECRET=your-secret-key-change-me-in-production \
+  --name rideway \
+  ghcr.io/melosso/rideway:latest
+```
+
+Then open your browser to [http://localhost:3000](http://localhost:3000)
+
+### Option 2: Docker Compose
+
+For more control and easier setup, use Docker Compose:
+
+1. Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  rideway-app:
+    image: ghcr.io/melosso/rideway:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - rideway-data:/app/data
+      - rideway-uploads:/app/public/uploads 
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
+    restart: unless-stopped
+
+volumes:
+  rideway-data:
+  rideway-uploads:
+```
+
+2. Start the container:
+
+```bash
+docker compose up -d
+```
+
+3. Open your browser to [http://localhost:3000](http://localhost:3000)
+
+### Option 3: Heroku
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/melosso/rideway/tree/master)
 
-Follow the documentation to understand setting the correct environment variables for the app to work with all the features. There might be breakages if you do not set the relevant environment variables.
+### Environment Variables
 
-### Other deployment options
+Customize your Rideway instance with these environment variables:
 
-For now, you'll have to rely on using your own skills to set-up a server with the following commands. We're working on a Docker container. 
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXTAUTH_URL` | Your site URL | `http://localhost:3000` |
+| `NEXTAUTH_SECRET` | Secret key for sessions | *Required* |
+| `DEFAULT_UNITS` | Default units (metric/imperial) | `metric` |
+| `DEFAULT_LANGUAGE` | Default language | `en` |
+| `DEFAULT_THEME` | Default theme (light/dark) | `light` |
+| `DEFAULT_CURRENCY` | Default currency code | `EUR` |
 
-1. **Clone the repo**
-   ```bash
-   git clone [repository-url]
-   cd rideway
-   ```
+## User Management & Password Reset
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+If a user has lost their password, you can use the built-in admin tool to reset it:
 
-3. **Set up your database**
-   ```bash
-   npm run db:setup
-   npm run db:migrate
-   ```
+```bash
+# For Docker:
+docker exec rideway node -r esbuild-register app/scripts/reset-password.js generate john@example.com
 
-4. **Fire it up**
-   ```bash
-   npm run dev
-   ```
+# For Docker Compose:
+docker compose exec rideway-app node -r esbuild-register app/scripts/reset-password.js generate john@example.com
+```
 
-5. **Open your browser**
-   Visit [http://localhost:3000](http://localhost:3000)
+This will generate a reset URL you can share with the user:
+```
+https://your-website.com/auth/reset-password/<token-here>
+```
 
-The setup wizard will walk you through creating your account and adding your first bike.
+You can also reset the password directly via command line:
+```bash
+docker exec rideway node -r esbuild-register app/scripts/reset-password.js reset <TOKEN> "new-secure-password"
+```
 
 ## Features That Matter
 
@@ -98,50 +151,19 @@ The setup wizard will walk you through creating your account and adding your fir
 - Import your data on any device running Rideway
 - No cloud subscriptions or vendor lock-in
 
-## User Management & Password Reset
-
-In Rideway, you can reset a password through the `Settings` page. If a user has lost their password, a CLI-based admin tool is available for managing user accounts without requiring external integrations. Perfect for self-hosted environments!
-
-### Password Reset Process
-
-#### Generate a reset token for a user
-```bash
-# Using Node.js directly
-node app/scripts/reset-password.js generate john@example.com
-
-# In Docker environment
-docker-compose exec app node app/scripts/reset-password.js generate john@example.com
-```
-
-This will generate a password reset token and provide:
-- A URL that can be shared with the user (they can reset their password through the web interface)
-- Instructions for resetting via command line
-
-You can share the URL you've received from the CLI with whomever has lost their password:
-
-```
-https://your-website.com/auth/reset-password/<token-here>
-```
-
-#### Reset a password directly via command line
-```bash
-# Using Node.js directly
-node app/scripts/reset-password.js reset <TOKEN> "new-secure-password"
-
-# In Docker environment
-docker-compose exec app node app/scripts/reset-password.js reset <TOKEN> "new-secure-password"
-```
-
-
-Each token:
-- Is unique and cryptographically secure
-- Expires after 24 hours
-- Can only be used once
-
 ## Screenshots
 
 <h5 align="center">Login</h5>
 <img src=".github/images/screenshot_2.png" align="center" />
+
+<h5 align="center">Adding to your garage</h5>
+<img src=".github/images/screenshot_3.png" align="center" />
+
+<h5 align="center">First set-up</h5>
+<img src=".github/images/screenshot_4.png" align="center" />
+
+<h5 align="center">Dashboard</h5>
+<img src=".github/images/screenshot_5.png" align="center" />
 
 ## Contributing
 
