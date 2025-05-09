@@ -7,7 +7,7 @@ services:
       - "3001:3000"
     volumes:
       - rideway-data:/app/data
-      - rideway-uploads:/app/public/uploads
+      - rideway-uploads:/app/public/uploads 
     environment:
       - NODE_ENV=production
       - NEXTAUTH_URL=http://localhost:3000

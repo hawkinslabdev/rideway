@@ -1,3 +1,4 @@
+// File: next.config.js
 import type { NextConfig } from "next";
 
 /**
@@ -43,6 +44,24 @@ const nextConfig: NextConfig = {
         destination: '/public/uploads/:path*',
       },
     ];
+  },
+  
+  // Image optimization configuration with safer implementation
+  images: {
+    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: '**',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+        pathname: '/uploads/**',
+      }
+    ],
+    unoptimized: process.env.NODE_ENV !== 'production',
   },
 };
 
