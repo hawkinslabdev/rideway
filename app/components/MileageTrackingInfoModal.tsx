@@ -27,7 +27,7 @@ export default function MileageTrackingInfoModal({ onClose }: MileageTrackingInf
         
         <div className="space-y-6">
           <p className="text-gray-700">
-            RideWay offers two different ways to track maintenance based on mileage:
+            Rideway offers two different ways to track maintenance based on mileage:
           </p>
           
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -97,7 +97,7 @@ export default function MileageTrackingInfoModal({ onClose }: MileageTrackingInf
               <div>
                 <h4 className="font-medium">Important Note</h4>
                 <p className="text-sm text-gray-700">
-                  When you update your motorcycle's mileage, RideWay will automatically adjust your 
+                  When you update your motorcycle's mileage, Rideway will automatically adjust your 
                   maintenance tracking. Fixed interval tasks will snap to their next milestone, while 
                   current-based tasks will maintain their originally scheduled value.
                 </p>

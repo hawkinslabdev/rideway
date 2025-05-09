@@ -337,10 +337,8 @@ async function cleanupDuplicateMileageLogs() {
     
     console.log(`Found ${allLogs.length} total mileage logs`);
     
-    // Group logs by motorcycle and timestamp proximity
-    const motorcycleGroups: Record<string, any[]> = {};
-    
     // Group logs by motorcycle ID
+    const motorcycleGroups: Record<string, any[]> = {};
     allLogs.forEach(log => {
       if (!motorcycleGroups[log.motorcycleId]) {
         motorcycleGroups[log.motorcycleId] = [];
@@ -369,14 +367,18 @@ async function cleanupDuplicateMileageLogs() {
         
         const previousLog = logs[i - 1];
         
-        // Check if this is potentially a duplicate
+        // Check if this is potentially a duplicate - using stricter criteria
         const isDuplicate = 
           // Same mileage values
           (currentLog.previousMileage === previousLog.previousMileage && 
            currentLog.newMileage === previousLog.newMileage) ||
-          // Log recorded within 5 seconds of previous log
+          // Log recorded within 10 seconds of previous log (more generous time window)
           (Math.abs(new Date(currentLog.date).getTime() - 
-                   new Date(previousLog.date).getTime()) < 5000);
+                   new Date(previousLog.date).getTime()) < 10000) ||
+          // Same mileage change within 1 minute (captures similar updates)
+          (Math.abs(new Date(currentLog.date).getTime() - new Date(previousLog.date).getTime()) < 60000 &&
+           Math.abs((currentLog.newMileage - (currentLog.previousMileage || 0)) - 
+                    (previousLog.newMileage - (previousLog.previousMileage || 0))) <= 1);
         
         if (!isDuplicate) {
           logsToKeep.push(currentLog.id);

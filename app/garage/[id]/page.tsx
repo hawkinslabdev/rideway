@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import ClientLayout from "@/app/components/ClientLayout";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import MaintenanceTimeline from "../../components/MaintenanceTimeline";
+import ActivityHistory from '@/app/components/ActivityHistory';
 
 interface Motorcycle {
   id: string;
@@ -549,88 +550,21 @@ export default function MotorcycleDetail() {
                 </div>
               </div>
               
-              {activityLogs.length > 0 ? (
-                <div className="relative">
-                  {/* Timeline Line */}
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-                  
-                  {/* Timeline Items */}
-                  <div className="space-y-4">
-                    {activityLogs.slice(0, 8).map((log) => (
-                      <div key={log.id} className="relative pl-10">
-                        {/* Timeline Icon */}
-                        <div className="absolute left-0 p-1 rounded-full bg-white border-2 border-blue-500">
-                          {log.type === 'maintenance' && <Wrench size={14} className="text-blue-500" />}
-                          {log.type === 'mileageUpdate' && <Gauge size={14} className="text-blue-500" />}
-                          {log.type === 'taskAdded' && <Calendar size={14} className="text-blue-500" />}
-                        </div>
-                        
-                        {/* Event Content */}
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <div className="flex flex-wrap justify-between mb-1">
-                            <h3 className="font-medium">{log.description}</h3>
-                            <time className="text-xs text-gray-500">
-                              {format(new Date(log.date), "MMM d, yyyy")}
-                            </time>
-                          </div>
-                          
-                          {log.type === 'maintenance' && log.details && (
-                            <div className="text-sm">
-                              {log.details.mileage && <p>Mileage: {formatDistance(log.details.mileage)}</p>}
-                              {log.details.cost && <p>Cost: ${log.details.cost.toFixed(2)}</p>}
-                              {log.details.notes && <p className="text-gray-600 mt-1">{log.details.notes}</p>}
-                            </div>
-                          )}
-                          
-                          {log.type === 'mileageUpdate' && log.details && (
-                            <div className="text-sm">
-                              {log.details.mileage && !log.details.previousMileage && <p>Mileage: {formatDistance(log.details.mileage)}</p>}
-                              {log.details.previousMileage && log.details.newMileage && (
-                                <p>
-                                  Updated from {formatDistance(log.details.previousMileage)} to {formatDistance(log.details.newMileage)}
-                                  {log.details.difference && ` (+${formatDistance(log.details.difference, 0)})`}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {activityLogs.length > 8 && (
-                    <div className="mt-4 text-center">
-                      <Link
-                        href={`/history?motorcycle=${motorcycle.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        View More Activity
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <FileText className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-                  <p className="text-gray-500 mb-4">No activity has been logged yet</p>
-                  <div className="flex flex-col sm:flex-row justify-center gap-4">
-                    <Link
-                      href={`/maintenance/add?motorcycle=${motorcycle.id}`}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center justify-center"
-                    >
-                      <Wrench size={16} className="mr-2" />
-                      Log Maintenance
-                    </Link>
-                    <button
-                      onClick={() => setShowMileageModal(true)}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 inline-flex items-center justify-center"
-                    >
-                      <Gauge size={16} className="mr-2" />
-                      Update Mileage
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Replace your existing activity logs display with the new component */}
+              <ActivityHistory 
+                motorcycleId={motorcycle.id}
+                limit={8}
+                className="mt-4"
+              />
+              
+              <div className="mt-6 text-center">
+                <Link
+                  href={`/history?motorcycle=${motorcycle.id}`}
+                  className="text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  View Complete History
+                </Link>
+              </div>
             </div>
           )}
 

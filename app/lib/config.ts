@@ -1,4 +1,4 @@
-// app/lib/config.ts
+// File: app/lib/config.ts
 
 /**
  * Application configuration
@@ -33,10 +33,22 @@ export const config = {
   defaultUnits: (process.env.DEFAULT_UNITS as UnitsType) || 'metric',
   
   /**
-   * Default language
+   * Default language/locale
    * Can be overridden with DEFAULT_LANGUAGE environment variable
    */
   defaultLanguage: process.env.DEFAULT_LANGUAGE || 'en',
+  
+  /**
+   * Default locale for number formatting
+   * Can be overridden with DEFAULT_LOCALE environment variable
+   */
+  defaultLocale: process.env.DEFAULT_LOCALE || 'en-US',
+  
+  /**
+   * Default currency code (ISO 4217)
+   * Can be overridden with DEFAULT_CURRENCY environment variable
+   */
+  defaultCurrency: process.env.DEFAULT_CURRENCY || 'EUR',
   
   /**
    * Default theme
@@ -64,6 +76,28 @@ export function getUnitsLabel(units: UnitsType): { distance: string, volume: str
   return units === 'metric' 
     ? { distance: 'km', volume: 'L' }
     : { distance: 'mi', volume: 'gal' };
+}
+
+/**
+ * Format a currency value according to the locale and currency settings
+ * @param value The value to format
+ * @param currency The currency code (optional, defaults to config setting)
+ * @param locale The locale (optional, defaults to config setting)
+ * @returns Formatted currency string
+ */
+export function formatCurrency(
+  value: number | null, 
+  currency = config.defaultCurrency, 
+  locale = config.defaultLocale
+): string {
+  if (value === null) return '';
+  
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 /**

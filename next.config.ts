@@ -24,11 +24,6 @@ const nextConfig: NextConfig = {
   // Add this for Docker deployment with standalone output
   output: 'standalone',
   
-  // Add these for better-sqlite3 support
-  experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3'],
-  },
-  
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = [...(config.externals || []), 'better-sqlite3'];

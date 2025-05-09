@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import { randomUUID } from "crypto";
+import { SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export async function GET(
   request: Request,
@@ -267,22 +268,48 @@ export async function PATCH(
       const body = await request.json();
       if (body.currentMileage !== undefined) {
         const newMileage = parseInt(body.currentMileage);
-        const oldMileage = motorcycle.currentMileage;
         
         if (oldMileage !== newMileage) {
-          // Log the mileage update
-          await db.insert(mileageLogs).values({
-            id: randomUUID(),
-            motorcycleId: id,
-            previousMileage: oldMileage,
-            newMileage: newMileage,
-            date: new Date(),
-            notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
-            createdAt: new Date()
+          // Check if there's a recent log (within last minute) to avoid duplicates
+          const recentLog = await db.query.mileageLogs.findFirst({
+            where: and(
+              eq(mileageLogs.motorcycleId, id),
+              eq(mileageLogs.newMileage, newMileage)
+            ),
+            orderBy: [desc(mileageLogs.date)]
           });
+          
+          // Only create a new log if not a duplicate
+          if (!recentLog || 
+              (new Date().getTime() - new Date(recentLog.date).getTime() > 60000)) {
+            // Log the mileage update
+            await db.insert(mileageLogs).values({
+              id: randomUUID(),
+              motorcycleId: id,
+              previousMileage: oldMileage,
+              newMileage: newMileage,
+              date: new Date(),
+              notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
+              createdAt: new Date()
+            });
+          }
           
           // Update maintenance tasks based on new mileage
           await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
+          
+          // Trigger mileage_updated event
+          await triggerEvent(session.user.id, "mileage_updated", {
+            motorcycle: {
+              id: motorcycle.id,
+              name: motorcycle.name,
+              make: motorcycle.make,
+              model: motorcycle.model,
+              year: motorcycle.year
+            },
+            previousMileage: oldMileage,
+            newMileage: newMileage,
+            units: process.env.DEFAULT_UNITS === 'metric' ? 'km' : 'mi'
+          });
         }
       }
       // Handle date field
@@ -446,4 +473,8 @@ async function updateMaintenanceTasks(motorcycleId: string, oldMileage: number |
     // For current-based intervals, we intentionally don't update the next due mileage
     // This keeps the maintenance schedule consistent and prevents it from being pushed forward
   }
+}
+
+function desc(date: SQLiteColumn<{ name: "date"; tableName: "mileage_logs"; dataType: "date"; columnType: "SQLiteTimestamp"; data: Date; driverParam: number; notNull: true; hasDefault: false; isPrimaryKey: false; isAutoincrement: false; hasRuntimeDefault: false; enumValues: undefined; baseColumn: never; identity: undefined; generated: undefined; }, {}, {}>): any {
+  throw new Error("Function not implemented.");
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { config, UnitsType, ThemeType, getUnitsLabel } from '../lib/config';
+import { config, UnitsType, ThemeType, getUnitsLabel, formatCurrency } from '../lib/config';
 import { DistanceUtil } from '../lib/utils/distance';
 import {
   convertTaskToDisplayUnits,
@@ -21,6 +21,8 @@ export interface AppSettings {
   language: string;
   theme: ThemeType;
   maintenanceView: 'calendar' | 'list';
+  currency: string; // Added currency property
+  locale: string;   // Added locale property
 }
 
 // Define the shape of our context
@@ -28,11 +30,13 @@ interface SettingsContextType {
   settings: AppSettings;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   saveSettings: () => Promise<void>;
-  getUnitsLabel: () => { distance: string, volume: string };
-  formatDistance: (value: number | null | undefined, decimals?: number) => string;
   // Conversion helpers
   convertToDisplayUnits: (valueInKm: number | null | undefined, decimals?: number) => number | null;
   convertToStorageUnits: (displayValue: number | null | undefined, decimals?: number) => number | null;
+  // Format helpers
+  formatCurrency: (value: number | null) => string;
+  getUnitsLabel: () => { distance: string, volume: string };
+  formatDistance: (value: number | null | undefined, decimals?: number) => string;
   // Enhanced conversion helpers for complex objects
   convertTaskToDisplay: (task: any) => any;
   convertMotorcycleToDisplay: (motorcycle: any) => any;
@@ -64,6 +68,8 @@ const defaultSettings: AppSettings = {
   language: config.defaultLanguage,
   theme: config.defaultTheme as ThemeType,
   maintenanceView: 'calendar',
+  currency: config.defaultCurrency || 'EUR', // Added default currency
+  locale: config.defaultLocale || 'en-US', // Added default locale
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -177,6 +183,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateSetting, 
         saveSettings,
         getUnitsLabel: getCurrentUnitsLabel,
+        formatCurrency: (value: number | null) => formatCurrency(value, settings.currency, settings.locale),
         formatDistance: formatCurrentDistance,
         convertToDisplayUnits,
         convertToStorageUnits,

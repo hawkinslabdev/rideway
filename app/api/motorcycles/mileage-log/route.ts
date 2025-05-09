@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, mileageLogs, maintenanceTasks } from "@/app/lib/db/schema";
 import { triggerEvent } from "@/app/lib/services/integrationService";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import { randomUUID } from "crypto";
@@ -54,16 +54,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create a mileage log entry
-    const logEntry = await db.insert(mileageLogs).values({
-      id: randomUUID(),
-      motorcycleId: motorcycleId,
-      previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
-      newMileage: newMileage,
-      date: new Date(),
-      notes: notes || `Updated mileage to ${newMileage}`,
-      createdAt: new Date(),
-    }).returning();
+    // Check for recent duplicate logs
+    const recentLog = await db.query.mileageLogs.findFirst({
+      where: and(
+        eq(mileageLogs.motorcycleId, motorcycleId),
+        eq(mileageLogs.newMileage, newMileage)
+      ),
+      orderBy: [desc(mileageLogs.date)]
+    });
+    
+    let logEntry;
+    
+    // Only create new log if not a recent duplicate
+    if (!recentLog || 
+        (new Date().getTime() - new Date(recentLog.date).getTime() > 60000)) {
+      // Create a mileage log entry
+      logEntry = await db.insert(mileageLogs).values({
+        id: randomUUID(),
+        motorcycleId: motorcycleId,
+        previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
+        newMileage: newMileage,
+        date: new Date(),
+        notes: notes || `Updated mileage to ${newMileage}`,
+        createdAt: new Date(),
+      }).returning();
+    } else {
+      logEntry = [recentLog];
+      console.log("Duplicate mileage log detected, using existing entry");
+    }
 
     // Update the motorcycle's current mileage
     await db.update(motorcycles)
