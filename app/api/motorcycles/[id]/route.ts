@@ -316,10 +316,10 @@ export async function PATCH(
       
       if (body.currentMileage !== undefined) {
         const newMileage = parseInt(body.currentMileage);
-        updateData.currentMileage = newMileage;
+        const oldMileage = motorcycle.currentMileage;
         
-        // Create mileage log entry when mileage changes
         if (oldMileage !== newMileage) {
+          // Log the mileage update
           await db.insert(mileageLogs).values({
             id: randomUUID(),
             motorcycleId: id,
@@ -331,80 +331,24 @@ export async function PATCH(
           });
           
           // Update maintenance tasks based on new mileage
-          if (body.currentMileage !== undefined) {
-            const newMileage = parseInt(body.currentMileage);
-            const oldMileage = motorcycle.currentMileage;
-            
-            if (oldMileage !== newMileage) {
-              await db.insert(mileageLogs).values({
-                id: randomUUID(),
-                motorcycleId: id,
-                previousMileage: oldMileage,
-                newMileage: newMileage,
-                date: new Date(),
-                notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
-                createdAt: new Date()
-              });
-              
-              // Update maintenance tasks based on new mileage
-              await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
-              
-              // Check for tasks that became due with this update
-              const notificationsTriggered = await checkForNewlyDueTasks(
-                session.user.id,
-                id,
-                oldMileage,
-                newMileage
-              );
-              
-              if (notificationsTriggered > 0) {
-                console.log(`Triggered ${notificationsTriggered} maintenance notifications for motorcycle ${id}`);
-              }
-            }
-          }
+          await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
           
-          // NEW CODE: Check for tasks that became due
-          // Get all tasks for this motorcycle
-          const tasks = await db.query.maintenanceTasks.findMany({
-            where: and(
-              eq(maintenanceTasks.motorcycleId, id),
-              eq(maintenanceTasks.archived, false)
-            ),
+          // Trigger mileage_updated event - ensuring this runs every time mileage changes
+          await triggerEvent(session.user.id, "mileage_updated", {
+            motorcycle: {
+              id: motorcycle.id,
+              name: motorcycle.name,
+              make: motorcycle.make,
+              model: motorcycle.model,
+              year: motorcycle.year
+            },
+            previousMileage: oldMileage,
+            newMileage: newMileage,
+            units: process.env.DEFAULT_UNITS === 'metric' ? 'km' : 'mi'
           });
-          
-          // Find tasks that became due with this mileage update
-          const newlyDueTasks = tasks.filter(task => {
-            // Check if the task has a mileage threshold and it's now due
-            return task.nextDueOdometer !== null && 
-                   task.nextDueOdometer <= newMileage &&
-                   (oldMileage === null || task.nextDueOdometer > oldMileage);
-          });
-          
-          // Trigger maintenance_due event for each task that just became due
-          for (const task of newlyDueTasks) {
-            // Check if we've recently notified for this task
-            if (!canNotifyForTask(task.id)) {
-              console.log(`Skipping notification for task ${task.id} (${task.name}) - recently notified`);
-              continue;
-            }
-            
-            await triggerEvent(session.user.id, "maintenance_due", {
-              motorcycle: {
-                id: motorcycle.id,
-                name: motorcycle.name,
-                make: motorcycle.make,
-                model: motorcycle.model,
-                year: motorcycle.year
-              },
-              task: {
-                id: task.id,
-                name: task.name
-              }
-            });
-            console.log(`Triggered maintenance_due event for task: ${task.name}`);
-          }
-        }          
+        }
       }
+
     }
 
     // Update motorcycle
