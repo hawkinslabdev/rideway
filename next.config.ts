@@ -1,4 +1,4 @@
-// next.config.ts 
+// File: next.config.ts
 
 import type { NextConfig } from "next";
 
@@ -19,9 +19,6 @@ const nextConfig: NextConfig = {
 
   // Use standalone output mode for minimal docker images
   output: 'standalone',
-  
-  // Optimization for better tree-shaking and smaller bundle
-  swcMinify: true,
   
   // Externalize better-sqlite3 since it's a native module
   webpack: (config, { isServer }) => {
@@ -48,13 +45,13 @@ const nextConfig: NextConfig = {
     ],
   },
   
-  // Experimental features for smaller output
+  // Remove experimental features for now to fix the build
+  /* 
   experimental: {
-    // Reduce JavaScript size
     optimizeCss: true,
-    // More efficient code splitting
     optimizePackageImports: ['react', 'react-dom', 'date-fns'],
   }
+  */
 };
 
 export default nextConfig;
