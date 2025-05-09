@@ -8,7 +8,6 @@ services:
     volumes:
       - rideway-data:/app/data
       - rideway-uploads:/app/public/uploads 
-      - ./moto_maintain.db:/app/data/moto_maintain.db
     environment:
       - NODE_ENV=production
       - NEXTAUTH_URL=http://localhost:3000
