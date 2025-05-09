@@ -15,6 +15,37 @@ export interface EventField {
   example: any;
 }
 
+export function isValidEventType(type: string): type is EventType {
+  return Object.keys(eventSchemas).includes(type as EventType);
+}
+
+export function getSafeEventSchema(eventType: string): EventSchema {
+  // Default schema for fallback
+  const defaultSchema: EventSchema = {
+    description: "Event schema information",
+    fields: [
+      {
+        path: "event",
+        type: "string",
+        description: "The type of event",
+        example: eventType
+      },
+      {
+        path: "timestamp",
+        type: "string",
+        description: "When the event was triggered",
+        example: new Date().toISOString()
+      }
+    ]
+  };
+  
+  if (isValidEventType(eventType)) {
+    return eventSchemas[eventType];
+  }
+  
+  return defaultSchema;
+}
+
 // Schema definitions for each event type
 export const eventSchemas: Record<EventType, EventSchema> = {
   "maintenance_due": {

@@ -3,7 +3,12 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
-import { eventSchemas, generateExamplePayload } from "@/app/lib/utils/eventSchemaDiscovery";
+import { 
+  eventSchemas, 
+  generateExamplePayload, 
+  getSafeEventSchema,
+  isValidEventType
+} from "@/app/lib/utils/eventSchemaDiscovery";
 import { EventType } from "@/app/lib/types/integrations";
 
 export async function GET(request: Request) {
@@ -18,12 +23,23 @@ export async function GET(request: Request) {
     }
     
     const url = new URL(request.url);
-    const eventType = url.searchParams.get('type') as EventType | null;
+    const eventTypeParam = url.searchParams.get('type');
     
-    if (eventType && eventSchemas[eventType]) {
-      // Return schema for a specific event type
-      const schema = eventSchemas[eventType];
-      const examplePayload = generateExamplePayload(eventType);
+    // Handle single event type request
+    if (eventTypeParam) {
+      // Get schema safely, falling back to a default if not found
+      const schema = getSafeEventSchema(eventTypeParam);
+      
+      // Generate example payload, or use a default if the function fails
+      let examplePayload;
+      try {
+        examplePayload = isValidEventType(eventTypeParam) 
+          ? generateExamplePayload(eventTypeParam as EventType)
+          : { event: eventTypeParam, timestamp: new Date().toISOString() };
+      } catch (err) {
+        console.error(`Error generating example payload for ${eventTypeParam}:`, err);
+        examplePayload = { event: eventTypeParam, timestamp: new Date().toISOString() };
+      }
       
       return NextResponse.json({
         schema,

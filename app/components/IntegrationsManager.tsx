@@ -103,8 +103,18 @@ export default function IntegrationsManager() {
     }
   };
   
-  const toggleIntegrationActive = async (id: string, currentActive: boolean) => {
+ const toggleIntegrationActive = async (id: string, currentActive: boolean) => {
     try {
+      const originalIntegrations = [...integrations];
+      
+      setIntegrations(prev => 
+        prev.map(integration => 
+          integration.id === id 
+            ? { ...integration, active: !currentActive } 
+            : integration
+        )
+      );
+      
       const response = await fetch(`/api/user/integrations/${id}`, {
         method: 'PATCH',
         headers: {
@@ -114,17 +124,10 @@ export default function IntegrationsManager() {
       });
       
       if (!response.ok) {
+        // If request fails, revert to original state
+        setIntegrations(originalIntegrations);
         throw new Error('Failed to update integration');
       }
-      
-      // Update local state
-      setIntegrations(prev => 
-        prev.map(integration => 
-          integration.id === id 
-            ? { ...integration, active: !currentActive } 
-            : integration
-        )
-      );
       
       toast.success(`Integration ${!currentActive ? 'enabled' : 'disabled'}`);
     } catch (err) {
@@ -132,6 +135,7 @@ export default function IntegrationsManager() {
       console.error(err);
     }
   };
+
   
   const deleteIntegration = async (id: string) => {
     if (!confirm('Are you sure you want to delete this integration?')) {
@@ -1158,23 +1162,19 @@ function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegratio
   const handleTemplateChange = (template: string) => {
     if (!activeEventType) return;
     
-    setIntegration((prev: typeof integration) => {
-      // Find the event to update
-      const updatedEvents = prev.events.map((event: any) => 
-        event.eventType === activeEventType 
-          ? { 
-              ...event, 
-              payloadTemplate: template
-            } 
-          : event
-      );
-      
-      return {
-        ...prev,
-        events: updatedEvents
-      };
-    });
+    // Update the integration.events array to include the new template
+    setIntegration((prev: Integration | null) => ({
+      ...prev!,
+      events: prev!.events.map((event: IntegrationEvent) => 
+      event.eventType === activeEventType 
+        ? { ...event, payloadTemplate: template } 
+        : event
+      )
+    }));
+    
+    console.log(`Updated template for ${activeEventType}:`, template.substring(0, 50) + "...");
   };
+
 
   const handleSave = async () => {
     try {
@@ -1396,16 +1396,31 @@ function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegratio
                 <div className={integration.config.useCustomPayload ? "" : "opacity-50 pointer-events-none"}>
                   <p className="text-sm text-gray-500 mb-2">
                     Custom payload templates allow you to format your webhook data for specific services.
-                    Click on "Edit Template" next to each event to customize how data is sent.
                   </p>
                   
-                  <div className="flex items-center text-sm text-blue-600">
-                    <Info size={16} className="mr-1.5" />
-                    <span>You can use variables like {"{{motorcycle.name}}"} in your templates</span>
+                  {/* Event Template List */}
+                  <div className="mt-3 space-y-2 border rounded-md p-3 bg-gray-50">
+                    {integration.events.map((event: IntegrationEvent) => (
+                      <div key={event.eventType} className="flex justify-between items-center p-2 hover:bg-gray-100 rounded">
+                        <div className="font-medium text-sm capitalize">{event.eventType.replace(/_/g, ' ')}</div>
+                        <button
+                          onClick={() => {
+                            setActiveEventType(event.eventType);
+                            setShowTemplateEditor(true);
+                          }}
+                          disabled={!integration.config.useCustomPayload}
+                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center"
+                        >
+                          <Edit size={12} className="mr-1" />
+                          Edit Template
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
+            
           </div>
         </div>
         
@@ -1437,13 +1452,13 @@ function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegratio
         </div>
       </div>
 
-      {/* Template Editor Modal - include it inside the parent component return */}
+      {/* Template Editor Modal */}
       {showTemplateEditor && activeEventType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b">
               <h2 className="text-xl font-semibold">
-                Edit Webhook Template: {(activeEventType || '').replace(/_/g, ' ')}
+                Edit Webhook Template: <span className="capitalize">{(activeEventType || '').replace(/_/g, ' ')}</span>
               </h2>
               <button 
                 onClick={() => setShowTemplateEditor(false)}
@@ -1455,23 +1470,35 @@ function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegratio
             
             <div className="flex-1 overflow-y-auto p-6">
               <WebhookTemplateEditor
-                eventType={activeEventType || ''}
+                eventType={activeEventType}
                 initialTemplate={integration.events.find((e: IntegrationEvent) => e.eventType === activeEventType)?.payloadTemplate || ''}
                 onChange={handleTemplateChange}
               />
             </div>
             
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-2">
               <button
                 onClick={() => setShowTemplateEditor(false)}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
-                Done
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Close the template editor after saving
+                  setShowTemplateEditor(false);
+                  // You might want to add some feedback here about template being saved
+                  toast.success("Template updated");
+                }}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Save Template
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -42,6 +42,7 @@ export async function GET() {
   }
 }
 
+// File: app/api/user/profile/route.ts
 export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -68,10 +69,13 @@ export async function PATCH(request: Request) {
       );
     }
 
+    // Normalize email to lowercase if provided
+    const normalizedEmail = email ? email.toLowerCase() : null;
+
     // Check if email is already taken by another user
-    if (email && email !== currentUser.email) {
+    if (normalizedEmail && normalizedEmail !== currentUser.email.toLowerCase()) {
       const existingUser = await db.query.users.findFirst({
-        where: eq(users.email, email),
+        where: eq(users.email, normalizedEmail),
       });
 
       if (existingUser) {
@@ -107,12 +111,12 @@ export async function PATCH(request: Request) {
       hashedPassword = await bcrypt.hash(newPassword, 10);
     }
 
-    // Update user
+    // Update user with normalized email
     const updatedUser = await db
       .update(users)
       .set({
         name: name || currentUser.name,
-        email: email || currentUser.email,
+        email: normalizedEmail || currentUser.email,
         password: hashedPassword,
       })
       .where(eq(users.id, session.user.id))

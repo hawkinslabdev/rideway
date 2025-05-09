@@ -97,50 +97,91 @@ export async function PATCH(
 
     const body = await request.json();
     
-    // Define the type for events
-    interface Event {
-      eventType: string;
-      enabled?: boolean;
-      templateData?: Record<string, any>;
-    }
-
-    // Update the integration
+    // Define update data object
     let updateData: any = {
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString()
     };
 
-    if (body.name) updateData.name = body.name;
-    if (body.active !== undefined) updateData.active = body.active;
+    // Handle name update
+    if (body.name !== undefined) {
+      updateData.name = body.name;
+    }
     
-    // If config is provided, encrypt it
+    // Handle active toggle specifically - ensure it's a boolean in the database
+    if (body.active !== undefined) {
+      // Make sure we store it as 0 or 1 for SQLite
+      updateData.active = body.active ? 1 : 0;
+    }
+    
+    // Handle config update
     if (body.config) {
-      updateData.config = encrypt(JSON.stringify(body.config));
+      try {
+        const configStr = JSON.stringify(body.config);
+        updateData.config = encrypt(configStr);
+      } catch (err) {
+        console.error("Error serializing config:", err);
+        return NextResponse.json(
+          { error: "Invalid configuration format" },
+          { status: 400 }
+        );
+      }
     }
 
+    // Debug log
+    console.log("Updating integration with data:", {
+      ...updateData,
+      config: updateData.config ? "[ENCRYPTED]" : undefined
+    });
+
     // Update the integration
-    await db.update(integrations)
-      .set(updateData)
-      .where(eq(integrations.id, id));
+    try {
+      await db.update(integrations)
+        .set(updateData)
+        .where(eq(integrations.id, id));
+        
+      console.log(`Integration ${id} updated successfully`);
+    } catch (err) {
+      console.error("Error updating integration:", err);
+      return NextResponse.json(
+        { error: "Failed to update integration data" },
+        { status: 500 }
+      );
+    }
 
     // If events are provided, update them
     if (body.events && Array.isArray(body.events)) {
-      // First delete all existing events
-      await db.delete(integrationEvents)
-        .where(eq(integrationEvents.integrationId, id));
+      try {
+        // First delete all existing events
+        await db.delete(integrationEvents)
+          .where(eq(integrationEvents.integrationId, id));
 
-      // Then create new ones
-      const eventEntries = body.events.map((event: Event) => ({
-        id: randomUUID(),
-        integrationId: id,
-        eventType: event.eventType,
-        enabled: event.enabled ?? true,
-        templateData: event.templateData ? JSON.stringify(event.templateData) : null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
+        // Then create new ones
+        const eventEntries = body.events.map((event: { eventType: string; enabled?: boolean; templateData?: any; payloadTemplate?: string }) => {
+          // Parse template data to a string if it exists
+          const templateDataStr = event.templateData ? 
+            JSON.stringify(event.templateData) : null;
+          
+          return {
+            id: randomUUID(),
+            integrationId: id,
+            eventType: event.eventType,
+            enabled: event.enabled ?? true,
+            templateData: templateDataStr,
+            payloadTemplate: event.payloadTemplate || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
 
-      if (eventEntries.length > 0) {
-        await db.insert(integrationEvents).values(eventEntries);
+        if (eventEntries.length > 0) {
+          await db.insert(integrationEvents).values(eventEntries);
+        }
+      } catch (err) {
+        console.error("Error updating integration events:", err);
+        return NextResponse.json(
+          { error: "Failed to update integration events" },
+          { status: 500 }
+        );
       }
     }
 
@@ -152,24 +193,39 @@ export async function PATCH(
       }
     });
 
+    // Log the update result
+    console.log("Updated integration:", {
+      id: updatedIntegration?.id,
+      name: updatedIntegration?.name,
+      active: updatedIntegration?.active
+    });
+
     // Decrypt for response
     if (!updatedIntegration) {
       return NextResponse.json(
-        { error: "Failed to update integration" },
+        { error: "Failed to retrieve updated integration" },
         { status: 500 }
       );
     }
 
-    const decryptedIntegration = {
-      ...updatedIntegration,
-      config: JSON.parse(decrypt(updatedIntegration.config)) as IntegrationConfig
-    };
+    try {
+      const decryptedIntegration = {
+        ...updatedIntegration,
+        config: JSON.parse(decrypt(updatedIntegration.config)) as IntegrationConfig
+      };
 
-    return NextResponse.json(decryptedIntegration);
+      return NextResponse.json(decryptedIntegration);
+    } catch (err) {
+      console.error("Error decrypting integration config:", err);
+      return NextResponse.json(
+        { error: "Failed to decrypt integration configuration" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error updating integration:", error);
     return NextResponse.json(
-      { error: "Failed to update integration" },
+      { error: `Failed to update integration: ${error instanceof Error ? error.message : "Unknown error"}` },
       { status: 500 }
     );
   }

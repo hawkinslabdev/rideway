@@ -1,4 +1,5 @@
 // app/api/motorcycles/mileage-log/route.ts
+
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";
 import { motorcycles, mileageLogs, maintenanceTasks } from "@/app/lib/db/schema";
@@ -72,18 +73,30 @@ export async function POST(request: Request) {
       })
       .where(eq(motorcycles.id, motorcycleId));
 
+    // Add debug logging 
+    console.log(`Mileage updated for motorcycle ${motorcycleId}: ${motorcycle.currentMileage || 'None'} -> ${newMileage}`);
+    console.log(`Triggering mileage_updated event for user ${session.user.id}`);
+
     // Trigger an event for the mileage update
-    await triggerEvent(session.user.id, "mileage_updated", {
-      motorcycle: {
-        id: motorcycle.id,
-        name: motorcycle.name,
-        make: motorcycle.make,
-        model: motorcycle.model,
-        year: motorcycle.year
-      },
-      previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
-      newMileage: newMileage
-    });
+    // DEBUG: Add more detailed logging for trigger event
+    try {
+      const eventResult = await triggerEvent(session.user.id, "mileage_updated", {
+        motorcycle: {
+          id: motorcycle.id,
+          name: motorcycle.name,
+          make: motorcycle.make,
+          model: motorcycle.model,
+          year: motorcycle.year
+        },
+        previousMileage: previousMileage !== undefined ? previousMileage : motorcycle.currentMileage,
+        newMileage: newMileage,
+        units: "miles" // Add units for clarity in notifications
+      });
+      
+      console.log("Mileage update event result:", eventResult);
+    } catch (err) {
+      console.error("Failed to trigger mileage_updated event:", err);
+    }
     
     // Get all tasks for this motorcycle
     const tasks = await db.query.maintenanceTasks.findMany({
@@ -96,10 +109,19 @@ export async function POST(request: Request) {
     // Find tasks that became due with this mileage update
     const newlyDueTasks = tasks.filter(task => {
       // Check if the task has a mileage threshold and it's now due
-      return task.nextDueOdometer !== null && 
+      const isDue = task.nextDueOdometer !== null && 
              task.nextDueOdometer <= newMileage &&
-             (previousMileage === null || task.nextDueOdometer > previousMileage);
-    });    
+             (previousMileage === null || previousMileage < task.nextDueOdometer);
+             
+      if (isDue) {
+        console.log(`Task ${task.id} (${task.name}) is newly due: ${task.nextDueOdometer} <= ${newMileage}`);
+      }
+      
+      return isDue;
+    });
+    
+    // Debug logging
+    console.log(`Found ${newlyDueTasks.length} newly due tasks for motorcycle ${motorcycleId}`);
     
     // Trigger maintenance_due event for each task that just became due
     let notificationsTriggered = 0;
@@ -113,29 +135,38 @@ export async function POST(request: Request) {
       // Make sure we're triggering the event with the correct parameters
       console.log(`Triggering maintenance_due event for task: ${task.name}`);
       
-      await triggerEvent(session.user.id, "maintenance_due", {
-        motorcycle: {
-          id: motorcycle.id,
-          name: motorcycle.name,
-          make: motorcycle.make,
-          model: motorcycle.model,
-          year: motorcycle.year
-        },
-        task: {
-          id: task.id,
-          name: task.name
-        }
-      });
-      
-      notificationsTriggered++;
-      console.log(`Triggered maintenance_due event for task: ${task.name}`);
+      try {
+        const eventResult = await triggerEvent(session.user.id, "maintenance_due", {
+          motorcycle: {
+            id: motorcycle.id,
+            name: motorcycle.name,
+            make: motorcycle.make,
+            model: motorcycle.model,
+            year: motorcycle.year
+          },
+          task: {
+            id: task.id,
+            name: task.name
+          }
+        });
+        
+        console.log(`Maintenance due event result for task ${task.id}:`, eventResult);
+        
+        notificationsTriggered++;
+      } catch (err) {
+        console.error(`Failed to trigger maintenance_due event for task ${task.id}:`, err);
+      }
     }
 
     if (notificationsTriggered > 0) {
       console.log(`Triggered ${notificationsTriggered} maintenance notifications for motorcycle ${motorcycleId}`);
     }
 
-    return NextResponse.json(logEntry[0], { status: 201 });
+    return NextResponse.json({
+      ...logEntry[0],
+      notificationsTriggered,
+      eventTriggered: true
+    }, { status: 201 });
   } catch (error) {
     console.error("Error logging mileage update:", error);
     return NextResponse.json(

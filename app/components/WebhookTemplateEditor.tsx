@@ -13,6 +13,7 @@ interface WebhookTemplateEditorProps {
 }
 
 export default function WebhookTemplateEditor({ eventType, initialTemplate, onChange }: WebhookTemplateEditorProps) {
+  // Initialize the template with the initial value or a default empty string
   const [template, setTemplate] = useState(initialTemplate || '');
   const [schema, setSchema] = useState<any | null>(null);
   const [examplePayload, setExamplePayload] = useState<any>(null);
@@ -31,10 +32,17 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
         const response = await fetch(`/api/user/integrations/event-schemas?type=${eventType}`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch schema');
+          throw new Error(`Failed to fetch schema (Status: ${response.status})`);
         }
         
         const data = await response.json();
+        
+        // Check if the response has the expected structure
+        if (!data.schema) {
+          console.warn('Schema data is missing expected structure:', data);
+          throw new Error('The server returned an invalid schema format');
+        }
+        
         setSchema(data.schema);
         setExamplePayload(data.examplePayload);
         
@@ -45,8 +53,33 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
           onChange(defaultTemplate);
         }
       } catch (err) {
-        setError('Failed to load field schema');
-        console.error(err);
+        console.error('Error loading schema:', err);
+        setError(`Failed to load field schema: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        
+        // Set a basic fallback schema
+        setSchema({
+          description: "Event data structure (schema unavailable)",
+          fields: [
+            {
+              path: "event",
+              type: "string",
+              description: "The type of event",
+              example: eventType
+            },
+            {
+              path: "timestamp",
+              type: "string",
+              description: "When the event was triggered",
+              example: new Date().toISOString()
+            }
+          ]
+        });
+        
+        // Set a basic fallback payload
+        setExamplePayload({ 
+          event: eventType, 
+          timestamp: new Date().toISOString()
+        });
       } finally {
         setIsLoading(false);
       }
@@ -55,11 +88,21 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
     fetchSchema();
   }, [eventType, initialTemplate, onChange]);
   
-  // Handle template changes
+  // Handle template changes with improved handler
   const handleTemplateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTemplate = e.target.value;
     setTemplate(newTemplate);
-    onChange(newTemplate);
+    
+    // Debounce the onChange callback to prevent excessive updates
+    // Clear any existing timeout
+    if ((handleTemplateChange as any).timeoutId) {
+      clearTimeout((handleTemplateChange as any).timeoutId);
+    }
+    
+    // Set new timeout
+    (handleTemplateChange as any).timeoutId = setTimeout(() => {
+      onChange(newTemplate);
+    }, 300);
   };
   
   // Copy field path to clipboard

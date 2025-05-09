@@ -17,7 +17,7 @@ import {
 // Log integration events for debugging
 export async function triggerEvent(userId: string, eventType: string, data: any) {
   try {
-    console.log(`Triggering event: ${eventType}`, data);
+    console.log(`[TriggerEvent] Starting: ${eventType}`, { userId, dataKeys: Object.keys(data) });
     
     // Find all active integrations for this user with this event type
     const userIntegrations = await db.query.integrations.findMany({
@@ -32,25 +32,39 @@ export async function triggerEvent(userId: string, eventType: string, data: any)
       }
     });
 
+    console.log(`[TriggerEvent] Found ${userIntegrations.length} total integrations for user`);
+
     // Filter to only active integrations that have this event type enabled
     const activeIntegrations = userIntegrations.filter(
       integration => integration.active && integration.events.length > 0
     );
 
-    if (activeIntegrations.length === 0) {
-      console.log(`No active integrations for ${eventType}`);
-      return { success: true, message: "No active integrations for this event type" };
-    }
+    console.log(`[TriggerEvent] Found ${activeIntegrations.length} active integrations for event ${eventType}`);
 
-    // For debugging purposes, let's log more information
-    console.log(`Found ${activeIntegrations.length} active integrations for ${eventType}`);
+    if (activeIntegrations.length === 0) {
+      console.log(`[TriggerEvent] No active integrations for ${eventType}`);
+      return { success: true, message: "No active integrations for this event type", integrations: 0 };
+    }
     
     // Process each integration
     const results = await Promise.all(
       activeIntegrations.map(async (integration) => {
         try {
+          console.log(`[TriggerEvent] Processing integration: ${integration.id} (${integration.name}) of type ${integration.type}`);
+          
           // Decrypt configuration
-          const config = JSON.parse(decrypt(integration.config));
+          let config;
+          try {
+            config = JSON.parse(decrypt(integration.config));
+            console.log(`[TriggerEvent] Successfully decrypted config for integration ${integration.id}`);
+          } catch (err) {
+            console.error(`[TriggerEvent] Failed to decrypt config for integration ${integration.id}:`, err);
+            return {
+              integrationId: integration.id,
+              success: false,
+              message: "Failed to decrypt integration configuration"
+            };
+          }
           
           // Get the event template data and payload template if available
           const event = integration.events[0];
@@ -62,46 +76,95 @@ export async function triggerEvent(userId: string, eventType: string, data: any)
           
           // Apply event template data if available
           if (event.templateData) {
-            const template = JSON.parse(event.templateData);
-            payload = {
-              ...payload,
-              ...template
-            };
+            try {
+              const template = JSON.parse(event.templateData);
+              payload = {
+                ...payload,
+                ...template
+              };
+              console.log(`[TriggerEvent] Applied template data for integration ${integration.id}`);
+            } catch (err) {
+              console.error(`[TriggerEvent] Failed to parse template data for integration ${integration.id}:`, err);
+            }
           }
           
           // Apply custom payload template for webhooks if enabled
-          if (integration.type === 'webhook' && 'payloadTemplate' in event && event.payloadTemplate) {
-            if (typeof event.payloadTemplate === 'string') {
-              payload = processTemplate(event.payloadTemplate, payload);
+          if (integration.type === 'webhook' && 
+              config.useCustomPayload === true && 
+              'payloadTemplate' in event && event.payloadTemplate) {
+            try {
+              if (typeof event.payloadTemplate === 'string') {
+                payload = processTemplate(event.payloadTemplate, payload);
+                console.log(`[TriggerEvent] Applied custom payload template for integration ${integration.id}`);
+              }
+            } catch (err) {
+              console.error(`[TriggerEvent] Failed to process payload template for integration ${integration.id}:`, err);
             }
           }
           
           // Send the event based on integration type
           let result;
-          switch(integration.type) {
-            case 'webhook':
-              result = await sendWebhookEvent(config, payload);
-              break;
-            case 'homeassistant':
-              result = await sendHomeAssistantEvent(config, payload);
-              break;
-            case 'ntfy':
-              result = await sendNtfyEvent(config, payload);
-              break;
-            default:
-              throw new Error(`Unsupported integration type: ${integration.type}`);
-          }
-          
-          // Log the result for debugging
-          console.log(`Integration ${integration.id} result:`, result);
+          try {
+            switch(integration.type) {
+              case 'webhook':
+                result = await sendWebhookEvent(config, payload);
+                break;
+              case 'homeassistant':
+                result = await sendHomeAssistantEvent(config, payload);
+                break;
+              case 'ntfy':
+                result = await sendNtfyEvent(config, payload);
+                break;
+              default:
+                throw new Error(`Unsupported integration type: ${integration.type}`);
+            }
+            
+            console.log(`[TriggerEvent] Integration ${integration.id} result:`, result);
 
-          return {
-            integrationId: integration.id,
-            success: result.success,
-            message: result.message
-          };
+            // Log the event
+            try {
+              await logIntegrationEvent(
+                integration.id,
+                eventType as EventType,
+                result.success ? "success" : "failed",
+                result.message,
+                payload,
+                result.response
+              );
+            } catch (err) {
+              console.error(`[TriggerEvent] Failed to log event for integration ${integration.id}:`, err);
+            }
+
+            return {
+              integrationId: integration.id,
+              success: result.success,
+              message: result.message
+            };
+          } catch (err) {
+            console.error(`[TriggerEvent] Error sending event for integration ${integration.id}:`, err);
+            
+            // Try to log the error
+            try {
+              await logIntegrationEvent(
+                integration.id,
+                eventType as EventType,
+                "failed",
+                err instanceof Error ? err.message : "Unknown error",
+                payload,
+                null
+              );
+            } catch (logErr) {
+              console.error(`[TriggerEvent] Failed to log error for integration ${integration.id}:`, logErr);
+            }
+            
+            return {
+              integrationId: integration.id,
+              success: false,
+              message: err instanceof Error ? err.message : "Unknown error"
+            };
+          }
         } catch (error) {
-          console.error(`Error triggering ${eventType} for integration ${integration.id}:`, error);
+          console.error(`[TriggerEvent] Unexpected error for integration ${integration.id}:`, error);
           return {
             integrationId: integration.id,
             success: false,
@@ -111,18 +174,25 @@ export async function triggerEvent(userId: string, eventType: string, data: any)
       })
     );
 
+    const successCount = results.filter(r => r.success).length;
+    console.log(`[TriggerEvent] Complete: ${eventType} - ${successCount}/${results.length} successful`);
+
     return {
-      success: results.every(r => r.success),
+      success: results.some(r => r.success), // At least one succeeded
+      integrations: activeIntegrations.length,
+      successful: successCount,
       results
     };
   } catch (error) {
-    console.error(`Error triggering ${eventType} event:`, error);
+    console.error(`[TriggerEvent] Global error for ${eventType} event:`, error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
+      integrations: 0
     };
   }
 }
+
 
 function preparePayload(
   type: IntegrationType, 
@@ -278,14 +348,17 @@ async function sendWebhookEvent(
   payload: any
 ): Promise<{ success: boolean, message: string, response?: any }> {
   try {
+    console.log(`[SendWebhook] Preparing to send webhook to ${config.url}`);
+    
     // Process template if custom payload is enabled
     const finalPayload = config.useCustomPayload && config.payloadTemplate 
       ? processTemplate(config.payloadTemplate, payload)
       : payload;
     
+    // Create headers object
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...config.headers
+      ...(config.headers || {})
     };
 
     // Add authentication if configured
@@ -308,12 +381,17 @@ async function sendWebhookEvent(
       }
     }
 
+    console.log(`[SendWebhook] Sending ${config.method} request to ${config.url}`);
+    
     // Send the request
     const response = await fetch(config.url, {
-      method: config.method,
+      method: config.method || 'POST',
       headers,
-      body: ['GET', 'HEAD'].includes(config.method) ? undefined : JSON.stringify(finalPayload)
+      body: ['GET', 'HEAD'].includes(config.method || 'POST') ? undefined : JSON.stringify(finalPayload)
     });
+
+    // Log response status
+    console.log(`[SendWebhook] Response status: ${response.status}`);
 
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
@@ -333,6 +411,7 @@ async function sendWebhookEvent(
       response: responseData
     };
   } catch (error) {
+    console.error("[SendWebhook] Error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error sending webhook"

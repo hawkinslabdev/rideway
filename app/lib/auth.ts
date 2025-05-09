@@ -1,3 +1,4 @@
+// File: app/lib/auth.ts
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "./db/db";
@@ -18,8 +19,11 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Convert email to lowercase for case-insensitive comparison
+        const normalizedEmail = credentials.email.toLowerCase();
+
         const user = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email),
+          where: eq(users.email, normalizedEmail),
         });
 
         if (!user || !user.password) {

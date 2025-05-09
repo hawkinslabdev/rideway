@@ -73,19 +73,10 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
   const handleMileageUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedMotorcycle) {
-      setError("Please select a motorcycle");
-      return;
-    }
-    
-    if (!newMileage) {
-      setError("Please enter a valid mileage value");
-      return;
-    }
+    if (!selectedMotorcycle || !newMileage) return;
     
     try {
       setUpdatingMileage(true);
-      setError("");
       
       // Validate mileage (should be greater than current)
       const mileageValue = parseInt(newMileage);
@@ -97,7 +88,9 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         throw new Error("New mileage cannot be less than current mileage");
       }
       
-      // Update mileage
+      console.log(`Updating mileage for ${selectedMotorcycle.name} to ${mileageValue}`);
+      
+      // First, update the motorcycle mileage
       const response = await fetch(`/api/motorcycles/${selectedMotorcycle.id}`, {
         method: "PATCH",
         headers: {
@@ -112,8 +105,8 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         throw new Error("Failed to update mileage");
       }
       
-      // Log mileage update
-      await fetch("/api/motorcycles/mileage-log", {
+      // Next, log the mileage update explicitly to trigger events
+      const logResponse = await fetch("/api/motorcycles/mileage-log", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -126,24 +119,30 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         }),
       });
       
-      // Update local state
-      setMotorcycles(motorcycles.map(m => 
-        m.id === selectedMotorcycle.id 
-          ? { ...m, currentMileage: mileageValue } 
-          : m
-      ));
+      if (!logResponse.ok) {
+        console.warn("Failed to log mileage update, but motorcycle was updated");
+      } else {
+        const logData = await logResponse.json();
+        console.log("Mileage log result:", logData);
+        
+        if (logData.notificationsTriggered > 0) {
+          toast.success(`${logData.notificationsTriggered} maintenance tasks are now due`, {
+            position: "bottom-center",
+            duration: 5000,
+          });
+        }
+      }
       
-      // Show success message
+      // Close modal and refresh data
       toast.success(`Updated mileage for ${selectedMotorcycle.name}`, {
         position: "bottom-center",
-        icon: <CheckCircle className="text-green-500" size={18} />,
       });
       
-      // Close modal after short delay
+      // Close the modal after short delay
       setTimeout(() => onClose(), 1500);
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update mileage");
+      toast.error(err instanceof Error ? err.message : "Failed to update mileage");
     } finally {
       setUpdatingMileage(false);
     }
@@ -233,7 +232,7 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
             <form onSubmit={handleMileageUpdate}>
               {/* Mileage Input */}
               <div className="mb-6">
-              <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <label htmlFor="mileage" className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
                 <span>Current Mileage</span>
                 <button
                   type="button"

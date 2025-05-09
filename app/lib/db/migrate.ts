@@ -3,7 +3,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, motorcycles, maintenanceTasks, maintenanceRecords, mileageLogs, integrations, integrationEvents, integrationTemplates } from './schema';
+import { users, motorcycles, maintenanceTasks, maintenanceRecords, passwordResetTokens, mileageLogs, integrations, integrationEvents, integrationTemplates } from './schema';
 import { encrypt } from '../utils/encryption';
 import { eq, or, isNull, and, not, sql } from "drizzle-orm";
 
@@ -562,6 +562,7 @@ async function ensurePasswordResetTable() {
     
     if (!tableExists) {
       // Create the table if it doesn't exist
+      console.log("Creating password_reset_tokens table...");
       db.$client.prepare(`
         CREATE TABLE password_reset_tokens (
           id TEXT PRIMARY KEY,
@@ -573,6 +574,54 @@ async function ensurePasswordResetTable() {
         )
       `).run();
       console.log("Created password_reset_tokens table");
+    } else {
+      console.log("password_reset_tokens table already exists");
+      
+      // Verify the table structure
+      const columns = db.$client.prepare("PRAGMA table_info(password_reset_tokens)").all();
+      const columnNames = columns.map((col: any) => col.name);
+      
+      console.log("password_reset_tokens columns:", columnNames);
+      
+      // Test inserting and deleting a dummy record to verify table works
+      try {
+        const testId = randomUUID();
+        const testToken = randomUUID();
+        const testUserId = (await db.query.users.findMany({ limit: 1 }))[0]?.id;
+        
+        if (testUserId) {
+          console.log("Testing password_reset_tokens table with user:", testUserId);
+          
+          // Insert test token
+          await db.insert(passwordResetTokens).values({
+            id: testId,
+            userId: testUserId,
+            token: testToken,
+            expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+            used: false,
+            createdAt: new Date()
+          });
+          
+          // Verify it was inserted
+          const inserted = await db.query.passwordResetTokens.findFirst({
+            where: eq(passwordResetTokens.id, testId)
+          });
+          
+          if (inserted) {
+            console.log("Successfully inserted test token");
+            
+            // Delete the test token
+            await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, testId));
+            console.log("Successfully deleted test token");
+          } else {
+            console.error("Failed to insert test token");
+          }
+        } else {
+          console.log("No users found to test password_reset_tokens table");
+        }
+      } catch (error) {
+        console.error("Error testing password_reset_tokens table:", error);
+      }
     }
   } catch (error) {
     console.error("Error ensuring password_reset_tokens table:", error);
@@ -623,7 +672,7 @@ async function ensureIntegrationEventsTable() {
     ).all().length > 0;
     
     if (!tableExists) {
-      // Create the table with templateData support
+      // Create the table with payloadTemplate support
       db.$client.prepare(`
         CREATE TABLE integration_events (
           id TEXT PRIMARY KEY,
@@ -632,8 +681,8 @@ async function ensureIntegrationEventsTable() {
           enabled INTEGER DEFAULT 1,
           templateData TEXT,
           payloadTemplate TEXT,
-          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updatedAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
         )
       `).run();
       console.log("Created integration_events table");
@@ -734,9 +783,6 @@ async function ensureIntegrationTemplatesTable() {
     throw error;
   }
 }
-
-// app/lib/db/migrate.ts
-// Add this function to populate the integration templates table
 
 async function setupDefaultIntegrationTemplates() {
   console.log("Setting up default integration templates...");
@@ -940,6 +986,35 @@ async function ensureMaintenanceScheduling() {
   }
 }
 
+async function ensureEventSchemaTables() {
+  console.log("Ensuring event schema tables exist...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='event_schema_cache'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE event_schema_cache (
+          id TEXT PRIMARY KEY,
+          eventType TEXT NOT NULL,
+          schema TEXT NOT NULL,
+          examplePayload TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      console.log("Created event_schema_cache table");
+    }
+  } catch (error) {
+    console.error("Error ensuring event schema tables:", error);
+    // Don't throw, just log the error to avoid breaking migration
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   await db.run(sql`
@@ -959,6 +1034,7 @@ async function runMigrations() {
     await ensureIntegrationEventsTable();
     await ensureIntegrationEventLogsTable();
     await ensureIntegrationTemplatesTable();
+    await ensureEventSchemaTables();
     await setupDefaultIntegrationTemplates();
     
     console.log("All migrations completed successfully!");

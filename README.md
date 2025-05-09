@@ -30,15 +30,13 @@ We use modern web tech that just works:
 - Secure authentication to keep your garage private
 - Charts and graphs to visualize your maintenance costs
 
-## Get Started in 5 Minutes
-
 ## Deployment
 
 ### Heroku one-click deploy
 
-Deploying Chatwoot to Heroku is a breeze. It's as simple as clicking this button:
+Deploying Rideway to Heroku is a breeze. It's as simple as clicking this button:
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/hawkinslabdev/rideway/tree/master)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/melosso/rideway/tree/master)
 
 Follow the documentation to understand setting the correct environment variables for the app to work with all the features. There might be breakages if you do not set the relevant environment variables.
 
@@ -59,7 +57,7 @@ For now, you'll have to rely on using your own skills to set-up a server with th
 
 3. **Set up your database**
    ```bash
-   npm run db:generate
+   npm run db:setup
    npm run db:migrate
    ```
 

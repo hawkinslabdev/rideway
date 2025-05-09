@@ -8,11 +8,23 @@ export default withAuth(
       "/setup",
       "/auth/signin",
       "/auth/forgot-password",
+      "/auth/reset-password",
     ];
     
     // Allow access to password reset page with token
-    if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
+    if (
+      req.nextUrl.pathname.startsWith("/api/auth/forgot-password") ||
+      req.nextUrl.pathname.startsWith("/api/auth/validate-token") ||
+      req.nextUrl.pathname.startsWith("/api/auth/reset-password")
+    ) {
       return NextResponse.next();
+    }
+
+    if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
+      const token = req.nextUrl.pathname.split("/").pop();
+      if (token) {
+        return NextResponse.next();
+      }
     }
     
     // Check if the current path is in the public paths list

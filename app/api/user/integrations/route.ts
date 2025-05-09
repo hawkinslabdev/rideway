@@ -68,8 +68,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Encrypt the configuration
-    const encryptedConfig = encrypt(JSON.stringify(body.config));
+    // Ensure config can be serialized to a valid JSON string
+    let encryptedConfig;
+    try {
+      const configStr = JSON.stringify(body.config);
+      encryptedConfig = encrypt(configStr);
+    } catch (err) {
+      console.error("Error serializing config:", err);
+      return NextResponse.json(
+        { error: "Invalid configuration format" },
+        { status: 400 }
+      );
+    }
 
     // Create the integration
     const newIntegration = await db.insert(integrations).values({
@@ -79,8 +89,8 @@ export async function POST(request: Request) {
       type: body.type,
       active: body.active ?? true,
       config: encryptedConfig,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(), // Use ISO string instead of Date object
+      updatedAt: new Date().toISOString(), // Use ISO string instead of Date object
     }).returning();
 
     // Define the type for event objects
@@ -88,19 +98,27 @@ export async function POST(request: Request) {
       eventType: string;
       enabled?: boolean;
       templateData?: Record<string, unknown>;
+      payloadTemplate?: string;
     }
 
     // If events are provided, create them
     if (body.events && Array.isArray(body.events)) {
-      const eventEntries = body.events.map((event: IntegrationEvent) => ({
-        id: randomUUID(),
-        integrationId: newIntegration[0].id,
-        eventType: event.eventType,
-        enabled: event.enabled ?? true,
-        templateData: event.templateData ? JSON.stringify(event.templateData) : null, // Ensure templateData is serialized
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
+      const eventEntries = body.events.map((event: IntegrationEvent) => {
+        // Parse templateData to a string if it exists
+        const templateDataStr = event.templateData ? 
+          JSON.stringify(event.templateData) : null;
+        
+        return {
+          id: randomUUID(),
+          integrationId: newIntegration[0].id,
+          eventType: event.eventType,
+          enabled: event.enabled ?? true,
+          templateData: templateDataStr,
+          payloadTemplate: event.payloadTemplate || null,
+          createdAt: new Date().toISOString(), // Use ISO string
+          updatedAt: new Date().toISOString(), // Use ISO string
+        };
+      });
 
       await db.insert(integrationEvents).values(eventEntries);
     }
@@ -130,7 +148,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating integration:", error);
     return NextResponse.json(
-      { error: "Failed to create integration" },
+      { error: `Failed to create integration: ${error instanceof Error ? error.message : "Unknown error"}` },
       { status: 500 }
     );
   }

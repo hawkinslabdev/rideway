@@ -107,6 +107,7 @@ export const integrationEvents = sqliteTable("integration_events", {
   eventType: text("eventType").notNull(), // "maintenance_due", "mileage_updated", etc.
   enabled: integer("enabled", { mode: "boolean" }).default(true),
   templateData: text("templateData"), // Optional JSON for event-specific template data
+  payloadTemplate: text("payloadTemplate"), // Optional template for custom payload formatting
   createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updatedAt").notNull().$defaultFn(() => new Date().toISOString()),
 });
