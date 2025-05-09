@@ -1,10 +1,6 @@
-// File: next.config.js
-import type { NextConfig } from "next";
+// next.config.ts 
 
-/**
- * Define environment variables that should be available to the client-side code
- * This is necessary to access these variables in browser context
- */
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -21,9 +17,13 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Add this for Docker deployment with standalone output
+  // Use standalone output mode for minimal docker images
   output: 'standalone',
   
+  // Optimization for better tree-shaking and smaller bundle
+  swcMinify: true,
+  
+  // Externalize better-sqlite3 since it's a native module
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = [...(config.externals || []), 'better-sqlite3'];
@@ -31,19 +31,9 @@ const nextConfig: NextConfig = {
     return config;
   },
   
-  // Add this to fix missing uploads directory issue
-  async rewrites() {
-    return [
-      {
-        source: '/uploads/:path*',
-        destination: '/public/uploads/:path*',
-      },
-    ];
-  },
-  
-  // Image optimization configuration with safer implementation
+  // Optimize image handling
   images: {
-    domains: ['localhost'],
+    unoptimized: process.env.NODE_ENV !== 'production',
     remotePatterns: [
       {
         protocol: 'http',
@@ -56,8 +46,15 @@ const nextConfig: NextConfig = {
         pathname: '/uploads/**',
       }
     ],
-    unoptimized: process.env.NODE_ENV !== 'production',
   },
+  
+  // Experimental features for smaller output
+  experimental: {
+    // Reduce JavaScript size
+    optimizeCss: true,
+    // More efficient code splitting
+    optimizePackageImports: ['react', 'react-dom', 'date-fns'],
+  }
 };
 
 export default nextConfig;
