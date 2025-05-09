@@ -1,4 +1,4 @@
-# File: .github/workflows/docker-build.yml
+# .github/workflows/docker-build.yml
 
 name: Build and Push Docker Image
 
@@ -8,6 +8,7 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # This allows manual triggering from the GitHub UI
 
 jobs:
   build:
