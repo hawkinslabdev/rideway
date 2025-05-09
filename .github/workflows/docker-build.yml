@@ -1,4 +1,4 @@
-# .github/workflows/docker-build.yml
+# File: .github/workflows/docker-build.yml
 
 name: Build and Push Docker Image
 
@@ -37,12 +37,13 @@ jobs:
             type=semver,pattern={{version}}
             type=ref,event=branch
             type=sha,format=short
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
 
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./Dockerfile.slim
+          file: ./Dockerfile  # Using the existing Dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
