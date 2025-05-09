@@ -30,8 +30,9 @@ WORKDIR /app
 # Set environment variables
 ENV NODE_ENV=production
 
-# Create necessary directories
-RUN mkdir -p public/uploads data
+# Create necessary directories with proper permissions
+RUN mkdir -p public/uploads data && \
+    chmod -R 777 public/uploads data
 
 # Install only production dependencies needed for SQLite
 RUN npm init -y && \
@@ -46,9 +47,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/app/lib/db ./app/lib/db
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/drizzle ./drizzle
-
-# Set proper permissions for data directories
-RUN chmod 777 public/uploads data
 
 # Create a simple start script
 RUN echo '#!/bin/sh' > ./start.sh && \

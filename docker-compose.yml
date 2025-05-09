@@ -4,15 +4,16 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - rideway-data:/app/data
       - rideway-uploads:/app/public/uploads 
+      - ./moto_maintain.db:/app/data/moto_maintain.db
     environment:
       - NODE_ENV=production
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
-      - SQLITE_DB_PATH=/app/data/moto_maintain.db
+      - SQLITE_DB_PATH=/app/data/moto_maintain.db      
     restart: unless-stopped
 
 volumes:

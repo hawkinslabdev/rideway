@@ -1105,7 +1105,7 @@ export default function MaintenancePage() {
 
       {/* Calendar View */}
       {view === "calendar" && (
-        <div className="bg-white rounded-lg shadow">
+        <div id="calendar-section" className="bg-white rounded-lg shadow">
           {/* Calendar Header */}
           <div className="p-4 border-b flex items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -1234,7 +1234,7 @@ export default function MaintenancePage() {
 
       {/* List View */}
       {view === "list" && (
-        <div className="space-y-4">
+        <div id="list-section" className="space-y-4">
           {/* Priority filter for list view */}
           <div className="bg-white rounded-lg shadow p-4 mb-4">
             <div className="flex items-center justify-between mb-2">

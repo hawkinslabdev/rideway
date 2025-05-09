@@ -292,13 +292,6 @@ export default function Dashboard() {
             
             {dashboardData?.motorcycles && dashboardData.motorcycles.length > 0 && (
               <div className="mt-4 sm:mt-0 flex space-x-2">
-                <Link 
-                  href="/maintenance/add"
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center hover:bg-blue-700 text-sm"
-                >
-                  <Wrench size={15} className="mr-1.5" />
-                  Log Maintenance
-                </Link>
                 <button
                   onClick={() => openMileageModal(defaultMotorcycle)}
                   className="px-3 py-2 border border-gray-300 rounded-md flex items-center hover:bg-gray-50 text-sm"
@@ -541,17 +534,25 @@ export default function Dashboard() {
                   {/* Other Motorcycles */}
                   {dashboardData.motorcycles.length > 1 && (
                     <div className="bg-white rounded-lg shadow mb-6 overflow-hidden">
-                      <div className="flex items-center justify-between p-4 border-b">
+                      <div className="flex justify-between p-4 border-b">
                         <h2 className="font-medium flex items-center">
-                          <Bike size={18} className="mr-2 text-gray-500" />
-                          Other Motorcycles
+                          <Calendar size={18} className="mr-2 text-gray-500" />
+                          Upcoming Maintenance
                         </h2>
-                        <Link 
-                          href="/garage" 
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          View All
-                        </Link>
+                        <div className="flex gap-4">
+                          <Link 
+                            href="/maintenance/add" 
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            Schedule New
+                          </Link>
+                          <Link 
+                            href="/maintenance" 
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            View All
+                          </Link>
+                        </div>
                       </div>
                       
                       <div className="divide-y">
@@ -694,7 +695,7 @@ export default function Dashboard() {
                             <span>All maintenance up to date</span>
                           </div>
                           <p className="text-green-700 mt-1">
-                            Great job! All your maintenance tasks are up to date. Keep an eye on upcoming tasks to stay on schedule.
+                            Great job! All your maintenance tasks are up to date.
                           </p>
                         </div>
                       </div>
@@ -708,12 +709,22 @@ export default function Dashboard() {
                         <Calendar size={18} className="mr-2 text-gray-500" />
                         Upcoming Maintenance
                       </h2>
-                      <Link 
-                        href="/maintenance" 
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        View All
-                      </Link>
+                      
+                      {/* Group the CTAs in their own flex container */}
+                      <div className="flex space-x-4"> {/* Added a flex container with spacing */}
+                        <Link 
+                          href="/maintenance/add" 
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          Schedule New
+                        </Link>
+                        <Link 
+                          href="/maintenance" 
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          View All
+                        </Link>
+                      </div>
                     </div>
                     
                     {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 ? (
@@ -789,11 +800,17 @@ export default function Dashboard() {
                   {/* Next Up Maintenance Summary */}
                   {dashboardData.upcomingMaintenance && dashboardData.upcomingMaintenance.length > 0 && (
                     <div className="bg-white rounded-lg shadow overflow-hidden">
-                      <div className="p-4 border-b">
+                      <div className="flex items-center justify-between p-4 border-b">
                         <h2 className="font-medium flex items-center">
                           <Info size={18} className="mr-2 text-gray-500" />
                           Maintenance Insights
                         </h2>
+                        <Link 
+                          href="/maintenance#calendar-section" 
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          View Calendar
+                        </Link>
                       </div>
                       
                       <div className="p-4">
@@ -833,7 +850,8 @@ export default function Dashboard() {
                           </div>
                         )}
                         
-                        {/* Schedule button */}
+                        {/*
+                        Schedule button 
                         <div className="mt-4 flex space-x-2">
                           <Link
                             href="/maintenance"
@@ -850,6 +868,7 @@ export default function Dashboard() {
                             Log Maintenance
                           </Link>
                         </div>
+                        */}
                       </div>
                     </div>
                   )}

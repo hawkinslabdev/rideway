@@ -375,11 +375,20 @@ export default function MotorcycleDetail() {
         {/* Motorcycle Profile Panel */}
         <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
           <div className="p-6 md:flex">
-            {/* Motorcycle Image */}
             <div className="md:w-1/3 mb-4 md:mb-0 md:mr-6">
               <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
                 {motorcycle.imageUrl ? (
-                  <img src={motorcycle.imageUrl} alt={motorcycle.name} className="w-full h-full object-cover" />
+                  <img 
+                    src={motorcycle.imageUrl + '?t=' + Date.now()} // Add cache-busting query parameter
+                    alt={motorcycle.name} 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => {
+                      console.error("Image failed to load:", motorcycle.imageUrl);
+                      // Fallback to no image display
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement?.classList.add('has-error');
+                    }}
+                  />
                 ) : (
                   <div className="flex flex-col items-center justify-center text-gray-400 h-full">
                     <Bike size={48} className="mb-2" />
