@@ -2,6 +2,7 @@
 
 import { db } from "../db/db";
 import { integrations, integrationEvents, integrationEventLogs } from "../db/schema";
+import { canTriggerEvent, getEventTrackingKey } from "../utils/notificationTracker";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "../utils/encryption";
 import { randomUUID } from "crypto";
@@ -19,6 +20,21 @@ export async function triggerEvent(userId: string, eventType: string, data: any)
   try {
     console.log(`[TriggerEvent] Starting: ${eventType}`, { userId, dataKeys: Object.keys(data) });
     
+    // Add throttling for mileage_updated events
+    if (eventType === 'mileage_updated' && data.motorcycle && data.motorcycle.id) {
+      const motorcycleId = data.motorcycle.id;
+      
+      // Use a shorter cooldown for mileage updates - 10 seconds
+      if (!canTriggerEvent(motorcycleId, eventType, 10 * 1000)) {
+        console.log(`[TriggerEvent] Skipping duplicate mileage_updated event for motorcycle ${motorcycleId}`);
+        return { 
+          success: true, 
+          message: "Event throttled to prevent duplicates", 
+          integrations: 0,
+          throttled: true
+        };
+      }
+    }
     // Find all active integrations for this user with this event type
     const userIntegrations = await db.query.integrations.findMany({
       where: eq(integrations.userId, userId),

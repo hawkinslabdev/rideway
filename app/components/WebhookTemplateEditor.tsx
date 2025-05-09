@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Info, Code, Copy, Check, RefreshCw, ChevronRight } from 'lucide-react';
 import { EventType } from '../lib/types/integrations';
 
@@ -24,12 +24,16 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
   
   // Fetch schema and example payload
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchSchema = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/user/integrations/event-schemas?type=${eventType}`);
+        const response = await fetch(`/api/user/integrations/event-schemas?type=${encodeURIComponent(eventType)}`);
+        
+        if (!isMounted) return;
         
         if (!response.ok) {
           throw new Error(`Failed to fetch schema (Status: ${response.status})`);
@@ -50,9 +54,16 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
         if (!initialTemplate || initialTemplate.trim() === '') {
           const defaultTemplate = JSON.stringify(data.examplePayload, null, 2);
           setTemplate(defaultTemplate);
-          onChange(defaultTemplate);
+          // Use a timeout to avoid rendering issues
+          setTimeout(() => {
+            if (isMounted) {
+              onChange(defaultTemplate);
+            }
+          }, 0);
         }
       } catch (err) {
+        if (!isMounted) return;
+        
         console.error('Error loading schema:', err);
         setError(`Failed to load field schema: ${err instanceof Error ? err.message : 'Unknown error'}`);
         
@@ -81,29 +92,47 @@ export default function WebhookTemplateEditor({ eventType, initialTemplate, onCh
           timestamp: new Date().toISOString()
         });
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
     fetchSchema();
-  }, [eventType, initialTemplate, onChange]);
+    
+    // Cleanup function to prevent state updates after unmounting
+    return () => {
+      isMounted = false;
+    };
+  }, [eventType, initialTemplate]);
   
   // Handle template changes with improved handler
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update the handleTemplateChange function to properly debounce
   const handleTemplateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTemplate = e.target.value;
     setTemplate(newTemplate);
     
-    // Debounce the onChange callback to prevent excessive updates
     // Clear any existing timeout
-    if ((handleTemplateChange as any).timeoutId) {
-      clearTimeout((handleTemplateChange as any).timeoutId);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
     
     // Set new timeout
-    (handleTemplateChange as any).timeoutId = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       onChange(newTemplate);
     }, 300);
   };
+
+  // Add a cleanup for the timeout in a useEffect
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
   
   // Copy field path to clipboard
   const copyFieldPath = (path: string) => {

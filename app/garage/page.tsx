@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useSettings } from "../contexts/SettingsContext";
+import Image from 'next/image';
 
 interface Motorcycle {
   id: string;
@@ -77,14 +78,26 @@ export default function Garage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMake, setSelectedMake] = useState("");
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<Record<string, number>>({});
   const dropdownTriggerRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+  const [showArchived, setShowArchived] = useState(() => {
+    // Only run this code in browser environment (not during SSR)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rideway-show-archived');
+      return saved === 'true';
+    }
+    return false;
+  });
 
   useEffect(() => {
     fetchMotorcycles();
     fetchMaintenanceAlerts();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('rideway-show-archived', showArchived.toString());
+  }, [showArchived]); 
 
   const fetchMotorcycles = async () => {
     try {
@@ -294,17 +307,17 @@ export default function Garage() {
                       } ${!motorcycle.isOwned ? 'opacity-80' : ''} hover:shadow-lg transition`}
                     >
                       <div className="md:flex">
-                        {/* Left side - Image */}
-                        <div className="md:w-1/3 h-full">
-                          <div className="h-48 md:h-full bg-gray-100 relative">
+                        {/* Left side - Image: Modern responsive approach */}
+                        <div className="md:w-1/3 grid grid-cols-1 grid-rows-1 bg-gray-100">
+                          <div className="col-span-1 row-span-1 aspect-[4/3] w-full relative">
                             {motorcycle.imageUrl ? (
                               <img 
                                 src={motorcycle.imageUrl} 
                                 alt={motorcycle.name}
-                                className="h-full w-full object-cover"
+                                className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="h-full w-full flex items-center justify-center">
+                              <div className="w-full h-full flex items-center justify-center">
                                 <Bike size={48} className="text-gray-400" />
                               </div>
                             )}

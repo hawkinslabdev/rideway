@@ -80,6 +80,7 @@ export default function IntegrationsManager() {
       const response = await fetch('/api/user/integrations/templates');
       
       if (!response.ok) {
+        console.error('Template fetch failed with status:', response.status);
         throw new Error('Failed to fetch templates');
       }
       
@@ -88,8 +89,11 @@ export default function IntegrationsManager() {
     } catch (err) {
       console.error('Failed to load templates:', err);
       // Not setting error here to avoid blocking the UI
+      // Just use an empty array instead
+      setTemplates([]);
     }
   };
+
   
   const refreshIntegrations = async () => {
     try {
@@ -1163,18 +1167,19 @@ function EditIntegrationModal({ integrationId, onClose, onSave }: EditIntegratio
     if (!activeEventType) return;
     
     // Update the integration.events array to include the new template
-    setIntegration((prev: Integration | null) => ({
-      ...prev!,
-      events: prev!.events.map((event: IntegrationEvent) => 
-      event.eventType === activeEventType 
+    setIntegration((prev: typeof integration) => {
+      if (!prev) return prev;
+      
+      return {
+        ...prev,
+        events: prev.events.map((event: IntegrationEvent) => 
+          event.eventType === activeEventType 
         ? { ...event, payloadTemplate: template } 
         : event
-      )
-    }));
-    
-    console.log(`Updated template for ${activeEventType}:`, template.substring(0, 50) + "...");
+        )
+      };
+    });
   };
-
 
   const handleSave = async () => {
     try {

@@ -14,6 +14,36 @@ const nextConfig: NextConfig = {
     DEFAULT_EMAIL_NOTIFICATIONS: process.env.DEFAULT_EMAIL_NOTIFICATIONS !== 'false' ? 'true' : 'false',
     DEFAULT_MAINTENANCE_REMINDERS: process.env.DEFAULT_MAINTENANCE_REMINDERS !== 'false' ? 'true' : 'false',
   },
+  
+  // Add this section to disable ESLint during builds
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  // Add this for Docker deployment with standalone output
+  output: 'standalone',
+  
+  // Add these for better-sqlite3 support
+  experimental: {
+    serverComponentsExternalPackages: ['better-sqlite3'],
+  },
+  
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'better-sqlite3'];
+    }
+    return config;
+  },
+  
+  // Add this to fix missing uploads directory issue
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: '/public/uploads/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

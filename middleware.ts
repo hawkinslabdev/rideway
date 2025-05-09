@@ -1,3 +1,5 @@
+// middleware.ts
+
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
@@ -11,20 +13,19 @@ export default withAuth(
       "/auth/reset-password",
     ];
     
-    // Allow access to password reset page with token
+    // Allow access to API routes needed for integrations
     if (
-      req.nextUrl.pathname.startsWith("/api/auth/forgot-password") ||
-      req.nextUrl.pathname.startsWith("/api/auth/validate-token") ||
-      req.nextUrl.pathname.startsWith("/api/auth/reset-password")
+      req.nextUrl.pathname.startsWith("/api/user/integrations") ||
+      req.nextUrl.pathname.startsWith("/api/auth")
     ) {
       return NextResponse.next();
     }
-
-    if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
-      const token = req.nextUrl.pathname.split("/").pop();
-      if (token) {
-        return NextResponse.next();
-      }
+    
+    // Allow access to password reset page with token
+    if (
+      req.nextUrl.pathname.startsWith("/auth/reset-password/")
+    ) {
+      return NextResponse.next();
     }
     
     // Check if the current path is in the public paths list
@@ -54,17 +55,14 @@ export default withAuth(
     },
     callbacks: {
       authorized: ({ token, req }) => {
-        // Check if this is a public API route
+        // Always allow API routes needed for integrations
         if (
-          req.nextUrl.pathname.startsWith("/api/auth/forgot-password") ||
-          req.nextUrl.pathname.startsWith("/api/auth/validate-token") ||
-          req.nextUrl.pathname.startsWith("/api/auth/reset-password")
+          req.nextUrl.pathname.startsWith("/api/user/integrations") ||
+          req.nextUrl.pathname.startsWith("/api/auth")
         ) {
           return true;
         }
-        if (req.nextUrl.pathname.startsWith("/api/admin/reset-password")) {
-          return true;
-        }
+        
         // Check if this is a password reset page with token
         if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
           return true;
@@ -94,11 +92,11 @@ export const config = {
     "/history/:path*",
     "/profile/:path*",
     "/settings/:path*",
-    "/auth/:path*", // Added to match auth routes
+    "/auth/:path*",
     "/api/dashboard/:path*",
     "/api/motorcycles/:path*",
     "/api/user/:path*",
-    "/api/auth/:path*", // Added to match auth API routes
+    "/api/auth/:path*",
     // Prevent static/public files from triggering middleware
     "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],

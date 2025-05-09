@@ -1,4 +1,4 @@
-// File: app/api/user/integrations/event-schemas/route.ts
+// app/api/user/integrations/event-schemas/route.ts
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";

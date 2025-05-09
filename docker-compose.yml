@@ -1,45 +1,20 @@
-version: '3.8'
-
 services:
-  rideway:
+  rideway-app:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
-    environment:
-      # Units of measurement (metric or imperial)
-      - DEFAULT_UNITS=metric
-      # Language settings
-      - DEFAULT_LANGUAGE=en
-      # Theme settings
-      - DEFAULT_THEME=light
-      # Notification settings
-      - DEFAULT_EMAIL_NOTIFICATIONS=true
-      - DEFAULT_MAINTENANCE_REMINDERS=true
-      # Authentication settings
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=your-secure-secret-key-here
+      - "3001:3000"
     volumes:
-      # Persist the SQLite database
-      - ./data:/app/data
+      - rideway-data:/app/data
+      - rideway-uploads:/app/public/uploads
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
+      - SQLITE_DB_PATH=/app/data/moto_maintain.db
     restart: unless-stopped
-    
-  # Optional: Add a reverse proxy like Caddy or Nginx for production use
-  # caddy:
-  #   image: caddy:2
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./Caddyfile:/etc/caddy/Caddyfile
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-  #   depends_on:
-  #     - rideway
 
-# Named volumes for persistent data (uncomment if using Caddy)
-# volumes:
-#   caddy_data:
-#   caddy_config:
+volumes:
+  rideway-data:
+  rideway-uploads:

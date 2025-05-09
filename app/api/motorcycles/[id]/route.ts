@@ -261,15 +261,16 @@ export async function PATCH(
       }
 
       // Handle mileage field - important for maintenance scheduling
-      const formMileage = formData.get('currentMileage');
+      const formMileage = formData.get('currentMileage');   
       const oldMileage = motorcycle.currentMileage;
-      
-      if (formMileage) {
-        const newMileage = parseInt(formMileage.toString());
-        updateData.currentMileage = newMileage;
+
+      const body = await request.json();
+      if (body.currentMileage !== undefined) {
+        const newMileage = parseInt(body.currentMileage);
+        const oldMileage = motorcycle.currentMileage;
         
-        // Create mileage log entry when mileage changes
         if (oldMileage !== newMileage) {
+          // Log the mileage update
           await db.insert(mileageLogs).values({
             id: randomUUID(),
             motorcycleId: id,
@@ -281,10 +282,9 @@ export async function PATCH(
           });
           
           // Update maintenance tasks based on new mileage
-          await updateMaintenanceTasks(id, oldMileage, newMileage);
+          await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
         }
       }
-
       // Handle date field
       const purchaseDate = formData.get('purchaseDate');
       if (purchaseDate) {
