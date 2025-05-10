@@ -36,7 +36,7 @@ RUN mkdir -p public/uploads data && \
 
 # Install only production dependencies needed for SQLite
 RUN npm init -y && \
-    npm install better-sqlite3 drizzle-orm esbuild-register
+    npm install better-sqlite3 drizzle-orm esbuild-register react-csv
 
 # Copy the standalone Next.js output
 COPY --from=builder /app/.next/standalone ./

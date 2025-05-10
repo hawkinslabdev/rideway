@@ -1,4 +1,4 @@
-// File: app/lib/config.ts
+// app/lib/config.ts
 
 /**
  * Application configuration

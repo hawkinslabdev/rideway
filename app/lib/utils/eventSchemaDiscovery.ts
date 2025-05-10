@@ -1,4 +1,4 @@
-// File: app/lib/utils/eventSchemaDiscovery.ts
+// app/lib/utils/eventSchemaDiscovery.ts
 
 import { EventType } from "../types/integrations";
 

@@ -1,4 +1,4 @@
-// File: app/components/WebhookTemplateEditor.tsx
+// app/components/WebhookTemplateEditor.tsx
 
 "use client";
 

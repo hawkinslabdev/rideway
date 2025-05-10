@@ -276,6 +276,7 @@ export default function SettingsPage() {
                 Preferences
               </h2>
               <div className="space-y-4">
+                {/* Units Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Units</label>
                   <select
@@ -287,6 +288,7 @@ export default function SettingsPage() {
                     <option value="imperial">Imperial (miles, gallons)</option>
                   </select>
                 </div>
+                {/* Language Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
                   <select
@@ -298,6 +300,50 @@ export default function SettingsPage() {
                     <option value="es">Spanish</option>
                     <option value="fr">French</option>
                     <option value="de">German</option>
+                  </select>
+                </div>
+                {/* Locale Selection */}
+                <div>
+                  <label htmlFor="locale" className="block text-sm font-medium text-gray-700 mb-1">
+                    Number Format
+                  </label>
+                  <select
+                    id="locale"
+                    value={settings.locale}
+                    onChange={(e) => handleSettingChange("locale", e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  >
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="de-DE">German</option>
+                    <option value="fr-FR">French</option>
+                    <option value="es-ES">Spanish</option>
+                    <option value="it-IT">Italian</option>
+                    <option value="nl-NL">Dutch</option>
+                    <option value="ja-JP">Japanese</option>
+                  </select>
+                </div>
+
+                {/* Currency Selection */}
+                <div>
+                  <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    id="currency"
+                    value={settings.currency}
+                    onChange={(e) => handleSettingChange("currency", e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  >
+                    <option value="USD">US Dollar ($)</option>
+                    <option value="EUR">Euro (€)</option>
+                    <option value="GBP">British Pound (£)</option>
+                    <option value="JPY">Japanese Yen (¥)</option>
+                    <option value="CAD">Canadian Dollar (C$)</option>
+                    <option value="AUD">Australian Dollar (A$)</option>
+                    <option value="CHF">Swiss Franc (CHF)</option>
+                    <option value="CNY">Chinese Yuan (¥)</option>
+                    <option value="INR">Indian Rupee (₹)</option>
                   </select>
                 </div>
               </div>
@@ -323,51 +369,6 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-            </div>
-
-            {/* Locale Selection */}
-            <div>
-              <label htmlFor="locale" className="block text-sm font-medium text-gray-700 mb-1">
-                Number Format
-              </label>
-              <select
-                id="locale"
-                value={settings.locale}
-                onChange={(e) => handleSettingChange("locale", e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                <option value="en-US">English (US)</option>
-                <option value="en-GB">English (UK)</option>
-                <option value="de-DE">German</option>
-                <option value="fr-FR">French</option>
-                <option value="es-ES">Spanish</option>
-                <option value="it-IT">Italian</option>
-                <option value="nl-NL">Dutch</option>
-                <option value="ja-JP">Japanese</option>
-              </select>
-            </div>
-
-            {/* Currency Selection */}
-            <div>
-              <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                Currency
-              </label>
-              <select
-                id="currency"
-                value={settings.currency}
-                onChange={(e) => handleSettingChange("currency", e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                <option value="USD">US Dollar ($)</option>
-                <option value="EUR">Euro (€)</option>
-                <option value="GBP">British Pound (£)</option>
-                <option value="JPY">Japanese Yen (¥)</option>
-                <option value="CAD">Canadian Dollar (C$)</option>
-                <option value="AUD">Australian Dollar (A$)</option>
-                <option value="CHF">Swiss Franc (CHF)</option>
-                <option value="CNY">Chinese Yuan (¥)</option>
-                <option value="INR">Indian Rupee (₹)</option>
-              </select>
             </div>
 
             {/* Data Management */}

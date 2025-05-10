@@ -87,6 +87,8 @@ docker compose up -d
 
 ### Option 3: Heroku
 
+Click the button to deploy this app to Heroku!
+
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/melosso/rideway/tree/master)
 
 ### Environment Variables

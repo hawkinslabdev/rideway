@@ -1,4 +1,4 @@
-// File: app/api/motorcycles/[id]/activity/route.ts
+// app/api/motorcycles/[id]/activity/route.ts
 
 import { NextResponse } from "next/server";
 import { db } from "@/app/lib/db/db";

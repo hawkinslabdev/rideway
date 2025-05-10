@@ -42,7 +42,7 @@ export async function GET() {
   }
 }
 
-// File: app/api/user/profile/route.ts
+// app/api/user/profile/route.ts
 export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions);

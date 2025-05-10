@@ -119,3 +119,98 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Additional responsive fixes to add to app/globals.css */
+
+/* Fix layout issues causing extra scrolling */
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Root layout setup */
+#__next, div[data-nextjs-root] {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* Ensure content doesn't jump on mobile */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+  
+  /* Mobile-specific layout fixes */
+  /* Prevent the 100vh sidebar height from causing extra scroll on mobile */
+  aside.h-screen {
+    height: 100% !important;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+  }
+  
+/* Fix mobile header positioning */
+  header.sticky {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+  
+  /* Make sure main content starts right after the header with proper spacing */
+  main {
+    padding-top: 0 !important; /* Override any inline styles */
+    margin-top: 16px !important; /* Add margin below the header */
+  }
+  
+  /* For pages that need more spacing */
+  .page-content {
+    padding-top: 16px;
+  }
+  
+  /* Add a subtle tap effect for the header title */
+  header .cursor-pointer:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+/* Mobile header title animation */
+@keyframes subtle-pulse {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.mobile-menu-hint {
+  animation: subtle-pulse 2s infinite;
+}
+
+/* Fix for iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen {
+    /* Fallback for browsers that don't support CSS variables */
+    min-height: 100vh; 
+    /* Mobile viewport bug fix */
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Fix potential overflow issues */
+.overflow-x-hidden {
+  overflow-x: hidden !important;
+}
+
+/* Fix for sticky positioning on iOS */
+.md\:sticky {
+  position: -webkit-sticky;
+  position: sticky;
+}
+
+/* Add active state feedback for mobile buttons */
+@media (max-width: 768px) {
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+    transition: transform 0.1s ease-in-out;
+  }
+}

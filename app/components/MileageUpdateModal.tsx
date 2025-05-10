@@ -1,3 +1,5 @@
+// File: app/components/MileageUpdateModal.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -88,8 +90,6 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         throw new Error("New mileage cannot be less than current mileage");
       }
       
-      console.log(`Updating mileage for ${selectedMotorcycle.name} to ${mileageValue}`);
-      
       // First, update the motorcycle mileage
       const response = await fetch(`/api/motorcycles/${selectedMotorcycle.id}`, {
         method: "PATCH",
@@ -123,7 +123,6 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
         console.warn("Failed to log mileage update, but motorcycle was updated");
       } else {
         const logData = await logResponse.json();
-        console.log("Mileage log result:", logData);
         
         if (logData.notificationsTriggered > 0) {
           toast.success(`${logData.notificationsTriggered} maintenance tasks are now due`, {
@@ -142,7 +141,7 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
       setTimeout(() => onClose(), 1500);
       
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update mileage");
+      setError(err instanceof Error ? err.message : "Failed to update mileage");
     } finally {
       setUpdatingMileage(false);
     }
@@ -162,87 +161,95 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-6">
+      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header - Fixed at the top */}
+        <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold flex items-center">
             <Gauge size={20} className="text-blue-600 mr-2" />
             Update Mileage
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2"
+            aria-label="Close modal"
           >
             <X size={20} />
           </button>
         </div>
         
-        {motorcycles.length === 0 ? (
-          <div className="text-center py-8">
-            <Bike size={40} className="mx-auto text-gray-400 mb-3" />
-            <p className="text-gray-600 mb-4">No motorcycles found</p>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Close
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Motorcycle Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Motorcycle
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {motorcycles.map((motorcycle) => (
-                  <div 
-                    key={motorcycle.id}
-                    onClick={() => handleMotorcycleSelect(motorcycle)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center ${
-                      selectedMotorcycle?.id === motorcycle.id 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="h-10 w-10 rounded-full flex-shrink-0 bg-gray-200 flex items-center justify-center mr-3">
-                      {motorcycle.imageUrl ? (
-                        <img 
-                          src={motorcycle.imageUrl} 
-                          alt={motorcycle.name}
-                          className="h-10 w-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <Bike size={20} className="text-gray-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{motorcycle.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {motorcycle.currentMileage 
-                          ? formatDistance(motorcycle.currentMileage) 
-                          : "No mileage data"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {motorcycles.length === 0 ? (
+            <div className="text-center py-8">
+              <Bike size={40} className="mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-600 mb-4">No motorcycles found</p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Close
+              </button>
             </div>
-            
-            <form onSubmit={handleMileageUpdate}>
-              {/* Mileage Input */}
+          ) : (
+            <>
+              {/* Motorcycle Selection - Improved scrollable area */}
               <div className="mb-6">
-              <label htmlFor="mileage" className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
-                <span>Current Mileage</span>
-                <button
-                  type="button"
-                  onClick={() => setShowMileageInfoModal(true)}
-                  className="text-blue-600 hover:text-blue-800 text-xs flex items-center"
-                >
-                  <Info size={14} className="mr-1" />
-                  How this affects maintenance
-                </button>
-              </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Motorcycle
+                </label>
+                
+                {/* Max height to ensure scrollability on small screens */}
+                <div className="max-h-[30vh] overflow-y-auto pr-1">
+                  {motorcycles.map((motorcycle) => (
+                    <div 
+                      key={motorcycle.id}
+                      onClick={() => handleMotorcycleSelect(motorcycle)}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center mb-2 ${
+                        selectedMotorcycle?.id === motorcycle.id 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="h-10 w-10 rounded-full flex-shrink-0 bg-gray-200 flex items-center justify-center mr-3">
+                        {motorcycle.imageUrl ? (
+                          <img 
+                            src={motorcycle.imageUrl} 
+                            alt={motorcycle.name}
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <Bike size={20} className="text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-grow">
+                        <p className="font-medium text-sm">{motorcycle.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {motorcycle.currentMileage 
+                            ? formatDistance(motorcycle.currentMileage) 
+                            : "No mileage data"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Mileage Input - Enhanced for mobile */}
+              <div className="mb-4">
+                <div className="flex flex-col space-y-1 mb-2">
+                  <label htmlFor="mileage" className="text-sm font-medium text-gray-700">
+                    Current Mileage
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowMileageInfoModal(true)}
+                    className="text-blue-600 hover:text-blue-800 text-xs flex items-center self-start"
+                  >
+                    <Info size={14} className="mr-1" />
+                    <span>How this affects maintenance</span>
+                  </button>
+                </div>
+                
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <input
                     type="number"
@@ -252,7 +259,7 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
                     min={selectedMotorcycle?.currentMileage || 0}
                     value={newMileage}
                     onChange={(e) => setNewMileage(e.target.value)}
-                    className={`focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md ${
+                    className={`focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-16 py-3 text-base sm:py-2 sm:text-sm border-gray-300 rounded-md ${
                       error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                     }`}
                     placeholder="Enter current mileage"
@@ -273,33 +280,35 @@ export default function MileageUpdateModal({ onClose }: MileageUpdateModalProps)
                   <p className="mt-1 text-xs text-red-600">{error}</p>
                 )}
               </div>
-              
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingMileage || !selectedMotorcycle}
-                  className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {updatingMileage ? (
-                    <>
-                      <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Mileage'
-                  )}
-                </button>
-              </div>
-            </form>
-          </>
+            </>
+          )}
+        </div>
+        
+        {/* Footer - Fixed at the bottom */}
+        {motorcycles.length > 0 && (
+          <div className="p-4 border-t flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-3 sm:py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleMileageUpdate}
+              disabled={updatingMileage || !selectedMotorcycle}
+              className="inline-flex items-center px-4 py-3 sm:py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {updatingMileage ? (
+                <>
+                  <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                  Updating...
+                </>
+              ) : (
+                'Update Mileage'
+              )}
+            </button>
+          </div>
         )}
       </div>
       

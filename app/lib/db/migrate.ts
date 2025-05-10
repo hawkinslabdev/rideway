@@ -1017,6 +1017,42 @@ async function ensureEventSchemaTables() {
   }
 }
 
+async function ensureServiceRecordsTable() {
+  console.log("Ensuring service_records table exists...");
+  
+  try {
+    // Check if the table exists
+    const tableExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='service_records'"
+    ).all().length > 0;
+    
+    if (!tableExists) {
+      // Create the table if it doesn't exist
+      db.$client.prepare(`
+        CREATE TABLE service_records (
+          id TEXT PRIMARY KEY NOT NULL,
+          motorcycle_id TEXT NOT NULL,
+          date INTEGER NOT NULL,
+          mileage INTEGER,
+          task TEXT NOT NULL,
+          cost REAL,
+          location TEXT,
+          notes TEXT,
+          created_at INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (motorcycle_id) REFERENCES motorcycles(id) ON DELETE CASCADE
+        )
+      `).run();
+      console.log("Created service_records table");
+    } else {
+      console.log("service_records table already exists");
+    }
+  } catch (error) {
+    console.error("Error ensuring service_records table:", error);
+    // Don't throw, just log the error to avoid breaking migration
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   await db.run(sql`
@@ -1038,6 +1074,7 @@ async function runMigrations() {
     await ensureIntegrationTemplatesTable();
     await ensureEventSchemaTables();
     await setupDefaultIntegrationTemplates();
+    await ensureServiceRecordsTable();
     
     console.log("All migrations completed successfully!");
   } catch (error) {

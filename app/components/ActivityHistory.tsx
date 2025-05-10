@@ -1,4 +1,4 @@
-// File: app/components/ActivityHistory.tsx
+// app/components/ActivityHistory.tsx
 
 "use client";
 

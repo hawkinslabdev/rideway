@@ -1,7 +1,6 @@
 // app/lib/db/schema.ts
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { relations } from "drizzle-orm";
-
+import { relations, sql } from "drizzle-orm";
 
 // Users table
 export const users = sqliteTable("users", {
@@ -134,6 +133,20 @@ export const integrationEventLogs = sqliteTable("integration_event_logs", {
   createdAt: text("createdAt").notNull().$defaultFn(() => new Date().toISOString()),
 });
 
+// Add this to the schema
+export const serviceRecords = sqliteTable("service_records", {
+  id: text("id").primaryKey().notNull(),
+  motorcycleId: text("motorcycle_id").notNull().references(() => motorcycles.id),
+  date: integer("date", { mode: "timestamp" }).notNull(),
+  mileage: integer("mileage"),
+  task: text("task").notNull(),
+  cost: real("cost"),
+  location: text("location"),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Define relationships
 export const motorcyclesRelations = relations(motorcycles, ({ one, many }) => ({
   user: one(users, {
@@ -186,5 +199,27 @@ export const integrationEventLogsRelations = relations(integrationEventLogs, ({ 
   integration: one(integrations, {
     fields: [integrationEventLogs.integrationId],
     references: [integrations.id],
+  }),
+}));
+
+export const motorcycleRelations = relations(motorcycles, ({ many }) => ({
+  serviceRecords: many(serviceRecords),
+}));
+
+export const serviceRecordRelations = relations(serviceRecords, ({ one }) => ({
+  motorcycle: one(motorcycles, {
+    fields: [serviceRecords.motorcycleId],
+    references: [motorcycles.id],
+  }),
+}));
+
+export const maintenanceRecordRelations = relations(maintenanceRecords, ({ one }) => ({
+  motorcycle: one(motorcycles, {
+    fields: [maintenanceRecords.motorcycleId],
+    references: [motorcycles.id],
+  }),
+  task: one(maintenanceTasks, {
+    fields: [maintenanceRecords.taskId],
+    references: [maintenanceTasks.id],
   }),
 }));
