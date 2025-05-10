@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Camera, Archive } from "lucide-react";
 import Sidebar from "../../../components/Sidebar";
+import ClientLayout from "@/app/components/ClientLayout";
 
 export default function EditMotorcycle({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -176,298 +177,300 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
   if (!motorcycleId) {
     return (
       <div className="flex h-screen bg-gray-100">
-        <Sidebar />
-        <main className="flex-1 overflow-auto p-6">
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        </main>
+        <ClientLayout>
+          <main className="flex-1 overflow-auto p-6">
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          </main>
+        </ClientLayout>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <Link href={`/garage/${motorcycleId}`} className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
-            <ArrowLeft size={16} className="mr-1" />
-            Back to Details
-          </Link>
-          
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold">Edit Motorcycle</h1>
-            <p className="text-gray-600">Update the details of your motorcycle</p>
-          </div>
+      <ClientLayout>
+        <main className="flex-1 overflow-auto p-6">
+          <div className="max-w-3xl mx-auto">
+            {/* Header */}
+            <Link href={`/garage/${motorcycleId}`} className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
+              <ArrowLeft size={16} className="mr-1" />
+              Back to Details
+            </Link>
+            
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold">Edit Motorcycle</h1>
+              <p className="text-gray-600">Update the details of your motorcycle</p>
+            </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-white shadow rounded-lg p-6">
-              {error && (
-                <div className="mb-4 p-4 text-sm text-red-800 bg-red-100 rounded">
-                  {error}
-                </div>
-              )}
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="bg-white shadow rounded-lg p-6">
+                {error && (
+                  <div className="mb-4 p-4 text-sm text-red-800 bg-red-100 rounded">
+                    {error}
+                  </div>
+                )}
 
-              {/* Photo Upload */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motorcycle Photo
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                  <div className="space-y-1 text-center">
-                    {imagePreview ? (
-                      <div className="mb-4">
-                        <img src={imagePreview} alt="Preview" className="mx-auto h-32 w-auto rounded-md object-cover" />
+                {/* Photo Upload */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Motorcycle Photo
+                  </label>
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div className="space-y-1 text-center">
+                      {imagePreview ? (
+                        <div className="mb-4">
+                          <img src={imagePreview} alt="Preview" className="mx-auto h-32 w-auto rounded-md object-cover" />
+                        </div>
+                      ) : (
+                        <Camera className="mx-auto h-12 w-12 text-gray-400" />
+                      )}
+                      <div className="flex text-sm text-gray-600">
+                        <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                          <span>{imagePreview ? 'Change photo' : 'Upload a photo'}</span>
+                          <input 
+                            type="file" 
+                            className="sr-only" 
+                            accept="image/*"
+                            onChange={handleImageChange}
+                          />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
                       </div>
-                    ) : (
-                      <Camera className="mx-auto h-12 w-12 text-gray-400" />
-                    )}
-                    <div className="flex text-sm text-gray-600">
-                      <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                        <span>{imagePreview ? 'Change photo' : 'Upload a photo'}</span>
-                        <input 
-                          type="file" 
-                          className="sr-only" 
-                          accept="image/*"
-                          onChange={handleImageChange}
-                        />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
+                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                     </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                   </div>
                 </div>
+
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      Nickname <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      required
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g., My Ducati"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="make" className="block text-sm font-medium text-gray-700">
+                      Make <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="make"
+                      id="make"
+                      required
+                      value={formData.make}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                      <option value="">Select make</option>
+                      {motorcycleMakes.map(make => (
+                        <option key={make} value={make}>{make}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="model" className="block text-sm font-medium text-gray-700">
+                      Model <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="model"
+                      id="model"
+                      required
+                      value={formData.model}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g., Monster 937"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="year" className="block text-sm font-medium text-gray-700">
+                      Year <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="year"
+                      id="year"
+                      required
+                      min="1900"
+                      max={new Date().getFullYear() + 1}
+                      value={formData.year}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="vin" className="block text-sm font-medium text-gray-700">
+                      VIN
+                    </label>
+                    <input
+                      type="text"
+                      name="vin"
+                      id="vin"
+                      value={formData.vin}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="17 characters"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="color" className="block text-sm font-medium text-gray-700">
+                      Color
+                    </label>
+                    <input
+                      type="text"
+                      name="color"
+                      id="color"
+                      value={formData.color}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g., Red"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="purchaseDate" className="block text-sm font-medium text-gray-700">
+                      Purchase Date
+                    </label>
+                    <input
+                      type="date"
+                      name="purchaseDate"
+                      id="purchaseDate"
+                      value={formData.purchaseDate}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="currentMileage" className="block text-sm font-medium text-gray-700">
+                      Current Mileage
+                    </label>
+                    <input
+                      type="number"
+                      name="currentMileage"
+                      id="currentMileage"
+                      min="0"
+                      value={formData.currentMileage}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g., 5000"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    id="notes"
+                    rows={3}
+                    value={formData.notes}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    placeholder="Any additional information about your motorcycle"
+                  />
+                </div>
               </div>
 
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    Nickname <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    id="name"
-                    required
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="e.g., My Ducati"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="make" className="block text-sm font-medium text-gray-700">
-                    Make <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="make"
-                    id="make"
-                    required
-                    value={formData.make}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  >
-                    <option value="">Select make</option>
-                    {motorcycleMakes.map(make => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="model" className="block text-sm font-medium text-gray-700">
-                    Model <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="model"
-                    id="model"
-                    required
-                    value={formData.model}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="e.g., Monster 937"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="year" className="block text-sm font-medium text-gray-700">
-                    Year <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="year"
-                    id="year"
-                    required
-                    min="1900"
-                    max={new Date().getFullYear() + 1}
-                    value={formData.year}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="vin" className="block text-sm font-medium text-gray-700">
-                    VIN
-                  </label>
-                  <input
-                    type="text"
-                    name="vin"
-                    id="vin"
-                    value={formData.vin}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="17 characters"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="color" className="block text-sm font-medium text-gray-700">
-                    Color
-                  </label>
-                  <input
-                    type="text"
-                    name="color"
-                    id="color"
-                    value={formData.color}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="e.g., Red"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="purchaseDate" className="block text-sm font-medium text-gray-700">
-                    Purchase Date
-                  </label>
-                  <input
-                    type="date"
-                    name="purchaseDate"
-                    id="purchaseDate"
-                    value={formData.purchaseDate}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="currentMileage" className="block text-sm font-medium text-gray-700">
-                    Current Mileage
-                  </label>
-                  <input
-                    type="number"
-                    name="currentMileage"
-                    id="currentMileage"
-                    min="0"
-                    value={formData.currentMileage}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="e.g., 5000"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  id="notes"
-                  rows={3}
-                  value={formData.notes}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Any additional information about your motorcycle"
-                />
-              </div>
-            </div>
-
-            {/* Form Actions */}
-            <div className="flex justify-between">
-              <button
-                type="button"
-                onClick={() => setShowOwnershipModal(true)}
-                className={`inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
-                  motorcycle?.isOwned
-                    ? "border-amber-300 text-amber-600 bg-white hover:bg-amber-50"
-                    : "border-blue-300 text-blue-600 bg-white hover:bg-blue-50"
-                }`}
-              >
-                <Archive size={16} className="mr-2" />
-                {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
-              </button>
-              
-              <div className="flex space-x-3">
-                <Link
-                  href={`/garage/${motorcycleId}`}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Cancel
-                </Link>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  <Save size={16} className="mr-2" />
-                  {loading ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Ownership toggle modal */}
-        {showOwnershipModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-medium mb-2">
-                {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {motorcycle?.isOwned
-                  ? "Archiving will mark this motorcycle as no longer owned. It will still appear in your service history but will be hidden from the main garage view."
-                  : "Restoring will mark this motorcycle as currently owned and make it visible in your garage again."}
-              </p>
-              
-              {motorcycle?.isOwned && motorcycle?.isDefault && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-                  <strong>Note:</strong> This motorcycle is currently set as your default. Archiving it will remove this status.
-                </div>
-              )}
-              
-              <div className="flex justify-end space-x-3">
+              {/* Form Actions */}
+              <div className="flex justify-between">
                 <button
                   type="button"
-                  onClick={() => setShowOwnershipModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleOwnership}
-                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                  onClick={() => setShowOwnershipModal(true)}
+                  className={`inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
                     motorcycle?.isOwned
-                      ? "bg-amber-600 hover:bg-amber-700"
-                      : "bg-blue-600 hover:bg-blue-700"
+                      ? "border-amber-300 text-amber-600 bg-white hover:bg-amber-50"
+                      : "border-blue-300 text-blue-600 bg-white hover:bg-blue-50"
                   }`}
-                  disabled={loading}
                 >
-                  {loading ? "Processing..." : (motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle")}
+                  <Archive size={16} className="mr-2" />
+                  {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
                 </button>
+                
+                <div className="flex space-x-3">
+                  <Link
+                    href={`/garage/${motorcycleId}`}
+                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    <Save size={16} className="mr-2" />
+                    {loading ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Ownership toggle modal */}
+          {showOwnershipModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg max-w-md w-full p-6">
+                <h3 className="text-lg font-medium mb-2">
+                  {motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle"}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {motorcycle?.isOwned
+                    ? "Archiving will mark this motorcycle as no longer owned. It will still appear in your service history but will be hidden from the main garage view."
+                    : "Restoring will mark this motorcycle as currently owned and make it visible in your garage again."}
+                </p>
+                
+                {motorcycle?.isOwned && motorcycle?.isDefault && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                    <strong>Note:</strong> This motorcycle is currently set as your default. Archiving it will remove this status.
+                  </div>
+                )}
+                
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnershipModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleOwnership}
+                    className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                      motorcycle?.isOwned
+                        ? "bg-amber-600 hover:bg-amber-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                    disabled={loading}
+                  >
+                    {loading ? "Processing..." : (motorcycle?.isOwned ? "Archive Motorcycle" : "Restore Motorcycle")}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </ClientLayout>
     </div>
   );
 }
