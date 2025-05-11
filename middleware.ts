@@ -1,7 +1,8 @@
-// middleware.ts
+// File: middleware.ts
 
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
 
 export default withAuth(
   function middleware(req) {
@@ -13,23 +14,26 @@ export default withAuth(
       "/auth/reset-password",
     ];
     
+    // Get the pathname of the request
+    const pathname = req.nextUrl.pathname;
+    
     // Allow access to API routes needed for integrations
     if (
-      req.nextUrl.pathname.startsWith("/api/user/integrations") ||
-      req.nextUrl.pathname.startsWith("/api/auth")
+      pathname.startsWith("/api/user/integrations") ||
+      pathname.startsWith("/api/auth")
     ) {
       return NextResponse.next();
     }
     
     // Allow access to password reset page with token
     if (
-      req.nextUrl.pathname.startsWith("/auth/reset-password/")
+      pathname.startsWith("/auth/reset-password/")
     ) {
       return NextResponse.next();
     }
     
     // Check if the current path is in the public paths list
-    const isPublicPath = publicPaths.includes(req.nextUrl.pathname);
+    const isPublicPath = publicPaths.includes(pathname);
     
     // Allow access to public paths without authentication
     if (isPublicPath) {
@@ -41,11 +45,54 @@ export default withAuth(
       return NextResponse.redirect(new URL("/setup", req.url));
     }
 
-    // Add cache-control headers to prevent caching of protected routes
+    // Initialize the response
     const response = NextResponse.next();
-    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
+    
+    // Set caching headers based on the endpoint type
+    if (req.method === 'GET') {
+      // API routes with different caching strategies
+      if (pathname.startsWith('/api/')) {
+        if (pathname.startsWith('/api/motorcycles') || 
+            pathname.startsWith('/api/maintenance') ||
+            pathname.startsWith('/api/service-history')) {
+          
+          // More specific path handling
+          if (pathname.includes('dashboard') || 
+              pathname.includes('/activity') || 
+              pathname.includes('/user')) {
+            // Short cache for dynamic data
+            response.headers.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=60');
+          } else if (pathname.match(/\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)) {
+            // Medium cache for specific item data (like /motorcycles/123)
+            response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=600');
+          } else {
+            // Longer cache for more static data
+            response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=3600');
+          }
+        } else if (pathname.startsWith('/api/health')) {
+          // Health checks can be cached briefly
+          response.headers.set('Cache-Control', 'public, max-age=30');
+        } else {
+          // Default for other API endpoints - no caching for user-specific/sensitive data
+          response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+          response.headers.set("Pragma", "no-cache");
+          response.headers.set("Expires", "0");
+        }
+      } else if (pathname.startsWith('/uploads/')) {
+        // Aggressive caching for uploaded images
+        response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        // Default for protected routes - no caching
+        response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        response.headers.set("Pragma", "no-cache");
+        response.headers.set("Expires", "0");
+      }
+    } else {
+      // For non-GET requests, always disable caching
+      response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      response.headers.set("Pragma", "no-cache");
+      response.headers.set("Expires", "0");
+    }
 
     return response;
   },
@@ -97,6 +144,9 @@ export const config = {
     "/api/motorcycles/:path*",
     "/api/user/:path*",
     "/api/auth/:path*",
+    "/api/maintenance/:path*", // Added this to cover all maintenance endpoints
+    "/api/service-history/:path*", // Added this to cover all service history endpoints
+    "/uploads/:path*", // Added this to handle image caching
     // Prevent static/public files from triggering middleware
     "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],

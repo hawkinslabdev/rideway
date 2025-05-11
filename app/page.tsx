@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import Image from 'next/image';
 import { toast } from "react-hot-toast";
 import ClientLayout from "./components/ClientLayout";
 import { 
@@ -371,11 +372,22 @@ export default function Dashboard() {
                   <div className="flex flex-col md:flex-row">
                     <div className="md:w-1/3 aspect-square md:aspect-auto md:h-auto relative bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
                       {defaultMotorcycle.imageUrl ? (
-                        <img 
-                          src={defaultMotorcycle.imageUrl} 
-                          alt={defaultMotorcycle.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <div className="relative w-full h-full">
+                          <Image 
+                            src={defaultMotorcycle.imageUrl}
+                            alt={defaultMotorcycle.name}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 33vw"
+                            className="object-cover"
+                            priority={true} // Loads this image immediately as it's important
+                            // Add cache buster if images are being updated but not reflecting
+                            // You can remove this part once caching is stable
+                            unoptimized={false}
+                            // Adding a simple blur placeholder while the image loads
+                            placeholder="blur"
+                            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+                          />
+                        </div>
                       ) : (
                         <div className="h-full w-full flex items-center justify-center">
                           <Bike size={64} className="text-white/60" />
@@ -655,14 +667,25 @@ export default function Dashboard() {
                         >
                           <div className="w-16 h-16 bg-blue-100 flex-shrink-0 flex items-center justify-center">
                             {motorcycle.imageUrl ? (
-                              <img 
-                                src={motorcycle.imageUrl} 
+                            <div className="relative w-full h-full">
+                              <Image 
+                                src={motorcycle.imageUrl}
                                 alt={motorcycle.name}
-                                className="w-full h-full object-cover"
+                                fill
+                                sizes="(max-width: 768px) 50vw, 16vw"
+                                className="object-cover"
+                                // This is a smaller image so we can load it lazily (no priority flag)
+                                loading="lazy"
+                                // Optional: adding blur placeholder for smoother loading
+                                placeholder="blur" 
+                                blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
                               />
-                            ) : (
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
                               <Bike size={24} className="text-blue-400" />
-                            )}
+                            </div>
+                          )}
                           </div>
                           <div className="flex-1 p-3 flex flex-col">
                             <div>
@@ -953,16 +976,24 @@ export default function Dashboard() {
                               <div className="flex items-center">
                                 <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden flex-shrink-0 mr-3">
                                   {motorcycle.imageUrl ? (
-                                    <img 
-                                      src={motorcycle.imageUrl} 
+                                  <div className="relative w-full h-full">
+                                    <Image 
+                                      src={motorcycle.imageUrl}
                                       alt={motorcycle.name}
-                                      className="w-full h-full object-cover"
+                                      fill
+                                      sizes="(max-width: 768px) 33vw, 10vw" 
+                                      className="object-cover"
+                                      loading="lazy"
+                                      quality={75} // Slightly lower quality is fine for thumbnails
+                                      // For very small thumbnails, we can use a simpler placeholder
+                                      placeholder="empty"
                                     />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <Bike size={16} className="text-gray-400" />
-                                    </div>
-                                  )}
+                                  </div>
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Bike size={16} className="text-gray-400" />
+                                  </div>
+                                )}
                                 </div>
                                 <div>
                                   <h3 className="font-medium text-sm">{motorcycle.name}</h3>

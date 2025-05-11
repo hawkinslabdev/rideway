@@ -312,16 +312,30 @@ export default function Garage() {
                           <div className="col-span-1 row-span-1 aspect-[4/3] w-full relative">
                             <Link href={`/garage/${motorcycle.id}`}>
                               {motorcycle.imageUrl ? (
-                                <img 
-                                  src={motorcycle.imageUrl} 
+                              <div className="relative w-full h-full cursor-pointer">
+                                <Image 
+                                  src={motorcycle.imageUrl}
                                   alt={motorcycle.name}
-                                  className="w-full h-full object-cover cursor-pointer"
+                                  fill
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                  className="object-cover"
+                                  loading="eager" // Load eagerly if this is an important image in the view
+                                  placeholder="blur"
+                                  blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+                                  // Add an optional onError handler to handle broken images
+                                  onError={(e) => {
+                                    // Replace with fallback or add error class
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.parentElement?.classList.add('image-error');
+                                  }}
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center cursor-pointer">
-                                  <Bike size={48} className="text-gray-400" />
-                                </div>
-                              )}
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center cursor-pointer">
+                                <Bike size={48} className="text-gray-400" />
+                              </div>
+                            )}
                             </Link>
                             
                             {/* Status badges */}
