@@ -55,6 +55,7 @@ export default function ProfilePage() {
     setSuccess(false);
 
     try {
+      // Validation code
       if (formData.newPassword) {
         if (formData.newPassword !== formData.confirmPassword) {
           throw new Error("New passwords do not match");
@@ -84,8 +85,19 @@ export default function ProfilePage() {
         const data = await response.json();
         throw new Error(data.message || "Failed to update profile");
       }
-
-      await update();
+      
+      const result = await response.json();
+      
+      // Update session with new user data
+      await update({
+        ...session,
+        user: {
+          ...session?.user,
+          name: result.user.name,
+          email: result.user.email
+        }
+      });
+      
       setSuccess(true);
       setFormData(prev => ({
         ...prev,
