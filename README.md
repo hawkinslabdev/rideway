@@ -71,6 +71,12 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "./healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   rideway-data:

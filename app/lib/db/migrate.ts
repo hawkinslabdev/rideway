@@ -1084,4 +1084,7 @@ async function runMigrations() {
 }
 
 // Run migrations when this file is executed directly
-runMigrations();
+runMigrations().catch((error) => {
+  console.error('Unhandled error during migration:', error);
+  process.exit(1);
+});
