@@ -72,7 +72,7 @@ services:
       - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "./healthcheck.sh"]
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3

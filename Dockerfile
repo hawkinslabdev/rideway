@@ -22,6 +22,9 @@ WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
+# Force Next.js to bind to all interfaces
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
 # Install curl for health checks
 RUN apk --no-cache add curl
@@ -44,9 +47,9 @@ COPY --from=builder /app/app/lib/db ./app/lib/db
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/drizzle ./drizzle
 
-# Create a health check script
+# Create an improved health check script that uses 0.0.0.0 instead of localhost
 RUN echo '#!/bin/sh' > ./healthcheck.sh && \
-    echo 'curl -f http://localhost:3000/api/health || exit 1' >> ./healthcheck.sh && \
+    echo 'curl -f http://0.0.0.0:3000/api/health || exit 1' >> ./healthcheck.sh && \
     chmod +x ./healthcheck.sh
 
 # Create a start script with improved error handling
