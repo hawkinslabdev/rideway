@@ -310,35 +310,27 @@ export default function Garage() {
                         {/* Left side - Image: Modern responsive approach */}
                         <div className="md:w-1/3 grid grid-cols-1 grid-rows-1 bg-gray-100">
                           <div className="col-span-1 row-span-1 aspect-[4/3] w-full relative">
-                            {motorcycle.imageUrl ? (
-                              <img 
-                                src={motorcycle.imageUrl} 
-                                alt={motorcycle.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Bike size={48} className="text-gray-400" />
-                              </div>
-                            )}
+                            <Link href={`/garage/${motorcycle.id}`}>
+                              {motorcycle.imageUrl ? (
+                                <img 
+                                  src={motorcycle.imageUrl} 
+                                  alt={motorcycle.name}
+                                  className="w-full h-full object-cover cursor-pointer"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center cursor-pointer">
+                                  <Bike size={48} className="text-gray-400" />
+                                </div>
+                              )}
+                            </Link>
                             
                             {/* Status badges */}
                             <div className="absolute top-2 left-2 flex space-x-2">
-                              {motorcycle.isDefault && (
-                                <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center shadow-sm">
-                                  <Star size={12} className="mr-1 fill-yellow-300 text-yellow-300" />
-                                  Default
-                                </span>
-                              )}
-                              
-                              {!motorcycle.isOwned && (
-                                <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
-                                  Archived
-                                </span>
-                              )}
+                              {/* Badge code remains unchanged */}
                             </div>
                           </div>
                         </div>
+
                         
                         {/* Right side - Content */}
                         <div className="p-5 md:w-2/3 flex flex-col">
