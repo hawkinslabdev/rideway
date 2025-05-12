@@ -26,7 +26,8 @@ export default withAuth(
     // Allow access to API routes needed for integrations
     if (
       pathname.startsWith("/api/user/integrations") ||
-      pathname.startsWith("/api/auth")
+      pathname.startsWith("/api/auth") ||
+      pathname.startsWith("/api/uploads") // Allow access to uploads API
     ) {
       return NextResponse.next();
     }

@@ -66,6 +66,11 @@ RUN echo '#!/bin/sh' > ./start.sh && \
 EXPOSE 3000
 
 # Define health check
+RUN echo '#!/bin/sh' > ./healthcheck.sh && \
+    echo 'curl -f http://0.0.0.0:3000/api/health || exit 1' >> ./healthcheck.sh && \
+    chmod +x ./healthcheck.sh
+
+# Define health check
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 CMD ./healthcheck.sh
 
 # Set the command to run the application

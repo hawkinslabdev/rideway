@@ -284,6 +284,20 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
                             src={imagePreview} 
                             alt="Preview" 
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Handle image loading errors
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              e.currentTarget.parentElement?.classList.add('image-error');
+                              // Optionally show error message or fallback icon
+                              const errorDiv = document.createElement('div');
+                              errorDiv.className = 'flex flex-col items-center justify-center';
+                              errorDiv.innerHTML = `
+                                <Camera className="h-12 w-12 text-gray-400" />
+                                <p class="text-xs text-gray-500 mt-2">Image failed to load</p>
+                              `;
+                              e.currentTarget.parentElement?.appendChild(errorDiv);
+                            }}
                           />
                         ) : (
                           <Camera className="h-12 w-12 text-gray-400" />
