@@ -1,99 +1,64 @@
-// app/api/uploads/[...path]/route.ts
-
-import { readFile } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+// app/api/uploads/[..path]/route.ts
+import { NextResponse } from 'next/server';
+import { join } from 'path';
+import fs from 'fs';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ path: string[] }> }
+  context: { params: Promise<{ file: string[] }> }
 ) {
+  // No need to await params since they're already resolved in this signature
+  const { file } = await context.params;
+  
+  const filePath = join(
+    process.cwd(),
+    'public',
+    'uploads',
+    ...(Array.isArray(file) ? file : [file])
+  );
+
   try {
-    // Await the params before using them
-    const { path } = await params;
-    
-    console.log("Request for image path:", path);
-    
-    // Get the file path from the params
-    const filePath = join(process.cwd(), 'public', 'uploads', ...path);
-    console.log("Full file path:", filePath);
-    
-    // Safety check - make sure the path is within the uploads directory
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    console.log("Uploads dir:", uploadsDir);
-    
-    if (!filePath.startsWith(uploadsDir)) {
-      console.error("Access denied: Path not within uploads directory");
-      return Response.json({ error: "Access denied" }, { status: 403 });
+    if (!filePath) {
+      throw new Error('File path is undefined');
     }
-    
-    // Check if the file exists
-    const fileExists = existsSync(filePath);
-    console.log("File exists:", fileExists);
-    
-    if (!fileExists) {
-      console.error("File not found:", filePath);
-      
-      // Try to list files in the directory to help debugging
-      try {
-        const { readdir } = require('fs/promises');
-        const dir = join(process.cwd(), 'public', 'uploads');
-        if (existsSync(dir)) {
-          const files = await readdir(dir);
-          console.log("Files in uploads directory:", files);
-        } else {
-          console.log("Uploads directory does not exist");
-        }
-      } catch (err) {
-        console.error("Error listing directory:", err);
-      }
-      
-      return Response.json({ 
-        error: "File not found", 
-        path: path,
-        requested: filePath 
-      }, { status: 404 });
+
+    // Check if file exists before trying to read it
+    if (!fs.existsSync(filePath)) {
+      console.error(`File not found: ${filePath}`);
+      return NextResponse.json(
+        { error: 'File not found' },
+        { status: 404 }
+      );
     }
-    
-    // Read the file
-    const file = await readFile(filePath);
-    console.log("File read successfully, size:", file.length);
-    
-    // Determine content type based on file extension
-    const extension = filePath.split('.').pop()?.toLowerCase();
-    let contentType = 'application/octet-stream';
-    
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-    }
-    
-    console.log("Serving file with content type:", contentType);
-    
-    // Return the file with appropriate caching headers
-    return new Response(file, {
+
+    const fileBuffer = fs.readFileSync(filePath);
+
+    // Set content type based on file extension
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      gif: 'image/gif',
+    };
+
+    // Ensure we're using a valid content type
+    const contentType = mimeTypes[ext || ''] || 'application/octet-stream';
+    console.log(`Serving file: ${filePath} with content type: ${contentType}`);
+
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
-      }
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
     });
-  } catch (error) {
-    console.error("Error serving image:", error);
-    return Response.json({ 
-      error: "Failed to serve image",
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+  } catch (err) {
+    console.error(`Error serving file: ${filePath}`, err);
+    return NextResponse.json(
+      { error: 'File not found or could not be processed' },
+      { status: 404 }
+    );
   }
 }

@@ -1,4 +1,4 @@
-// next.config.ts
+// File: next.config.ts
 
 import type { NextConfig } from "next";
 
@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
       }
     ],
     // Enable image caching - added this configuration
-    minimumCacheTTL: 60, // cache for at least 60 seconds
+    minimumCacheTTL: 86400, // cache for a day
     formats: ['image/webp'], // prefer WebP for better compression
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048], // responsive image sizes
     imageSizes: [16, 32, 64, 96, 128, 256], // icon sizes

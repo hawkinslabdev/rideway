@@ -4,7 +4,19 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Trash2, AlertCircle, Edit } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Save, 
+  Trash2, 
+  AlertCircle, 
+  Edit, 
+  Calendar,
+  FileText,
+  Gauge,
+  DollarSign,
+  Bike,
+  MapPin
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
 import ClientLayout from "../../components/ClientLayout";
 import { useSettings } from "../../contexts/SettingsContext";
@@ -33,6 +45,7 @@ export default function ServiceRecordDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { formatDistance, formatCurrency } = useSettings();
+  
   const [record, setRecord] = useState<ServiceRecord | null>(null);
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [isLoading, setIsLoading] = useState(true);

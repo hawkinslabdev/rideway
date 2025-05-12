@@ -30,12 +30,13 @@ ENV PORT=3000
 RUN apk --no-cache add curl
 
 # Create necessary directories with proper permissions
+# These directories will be mounted from the host in docker-compose.yml
 RUN mkdir -p public/uploads data && \
     chmod -R 777 public/uploads data
 
 # Install only production dependencies needed for SQLite
 RUN npm init -y && \
-    npm install better-sqlite3 drizzle-orm esbuild-register react-csv react-swipeable
+    npm install better-sqlite3 drizzle-orm esbuild-register react-csv react-swipeable 
 
 # Copy the standalone Next.js output
 COPY --from=builder /app/.next/standalone ./
@@ -57,6 +58,7 @@ RUN echo '#!/bin/sh' > ./start.sh && \
     echo 'set -e' >> ./start.sh && \
     echo 'echo "Running database migrations..."' >> ./start.sh && \
     echo 'mkdir -p /app/data' >> ./start.sh && \
+    echo 'chown -R node:node /app/data /app/public/uploads' >> ./start.sh && \
     echo 'node -r esbuild-register ./app/lib/db/migrate.ts || { echo "Migration failed with status $?"; exit 1; }' >> ./start.sh && \
     echo 'echo "Starting Next.js application..."' >> ./start.sh && \
     echo 'exec node server.js' >> ./start.sh && \
@@ -65,12 +67,7 @@ RUN echo '#!/bin/sh' > ./start.sh && \
 # Expose port
 EXPOSE 3000
 
-# Define health check
-RUN echo '#!/bin/sh' > ./healthcheck.sh && \
-    echo 'curl -f http://0.0.0.0:3000/api/health || exit 1' >> ./healthcheck.sh && \
-    chmod +x ./healthcheck.sh
-
-# Define health check
+# Define health check (only defined once)
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 CMD ./healthcheck.sh
 
 # Set the command to run the application

@@ -1,5 +1,7 @@
 // app/lib/db/migrate.ts
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import fs from 'fs';
+import path from 'path';
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -19,6 +21,19 @@ function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+export async function ensureUploadsDirectory() {
+  const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
+  
+  if (!fs.existsSync(uploadsPath)) {
+    try {
+      fs.mkdirSync(uploadsPath, { recursive: true });
+      console.log('Uploads directory created successfully');
+    } catch (error) {
+      console.error('Error creating uploads directory:', error);
+    }
+  }
 }
 
 // Ensure the required columns exist in the tables
@@ -1053,6 +1068,27 @@ async function ensureServiceRecordsTable() {
   }
 }
 
+async function ensureServiceRecordsHasTaskId() {
+  console.log("Ensuring service_records table has taskId column...");
+  
+  try {
+    // Check if the column exists
+    const columns = db.$client.prepare("PRAGMA table_info(service_records)").all();
+    const columnNames = columns.map((col: any) => col.name);
+    
+    if (!columnNames.includes("task_id")) {
+      console.log("Adding task_id column to service_records table");
+      db.$client.prepare("ALTER TABLE service_records ADD COLUMN task_id TEXT REFERENCES maintenance_tasks(id)").run();
+      console.log("task_id column added successfully");
+    } else {
+      console.log("task_id column already exists in service_records table");
+    }
+  } catch (error) {
+    console.error("Error ensuring task_id column in service_records table:", error);
+    // Don't throw, to avoid breaking the migration
+  }
+}
+
 // Execute all migration steps in sequence
 async function runMigrations() {
   await db.run(sql`
@@ -1075,6 +1111,7 @@ async function runMigrations() {
     await ensureEventSchemaTables();
     await setupDefaultIntegrationTemplates();
     await ensureServiceRecordsTable();
+    await ensureServiceRecordsHasTaskId();
     
     console.log("All migrations completed successfully!");
   } catch (error) {

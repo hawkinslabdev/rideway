@@ -137,16 +137,17 @@ export const integrationEventLogs = sqliteTable("integration_event_logs", {
 export const serviceRecords = sqliteTable("service_records", {
   id: text("id").primaryKey().notNull(),
   motorcycleId: text("motorcycle_id").notNull().references(() => motorcycles.id),
+  taskId: text("task_id").references(() => maintenanceTasks.id), // Add reference to maintenance tasks
   date: integer("date", { mode: "timestamp" }).notNull(),
   mileage: integer("mileage"),
   task: text("task").notNull(),
   cost: real("cost"),
   location: text("location"),
   notes: text("notes"),
+  receiptUrl: text("receipt_url"), // Add field for receipt images
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
-
 // Define relationships
 export const motorcyclesRelations = relations(motorcycles, ({ one, many }) => ({
   user: one(users, {
@@ -210,6 +211,10 @@ export const serviceRecordRelations = relations(serviceRecords, ({ one }) => ({
   motorcycle: one(motorcycles, {
     fields: [serviceRecords.motorcycleId],
     references: [motorcycles.id],
+  }),
+  task: one(maintenanceTasks, {  
+    fields: [serviceRecords.taskId],
+    references: [maintenanceTasks.id],
   }),
 }));
 
