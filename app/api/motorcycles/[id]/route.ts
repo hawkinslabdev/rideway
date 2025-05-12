@@ -224,26 +224,39 @@ export async function PATCH(
       const imageFile = formData.get('image') as File | null;
       
       if (imageFile && imageFile.size > 0) {
-        const bytes = await imageFile.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        
-        // Create a unique filename
-        const extension = imageFile.name.split('.').pop();
-        const randomString = Math.random().toString(36).substring(2, 15);
-        const filename = `${Date.now()}-${randomString}.${extension}`;
-        const publicPath = join(process.cwd(), 'public', 'uploads');
-        const filePath = join(publicPath, filename);
-        
-        // Ensure the uploads directory exists
         try {
+          const bytes = await imageFile.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          
+          // Create a unique filename
+          const extension = imageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+          
+          // Validate file extension
+          if (!validExtensions.includes(extension)) {
+            throw new Error("Invalid file type. Only JPG, PNG, GIF and WebP are supported.");
+          }
+          
+          const randomString = Math.random().toString(36).substring(2, 15);
+          const filename = `${Date.now()}-${randomString}.${extension}`;
+          
+          // Create path with proper OS-specific separator
+          const publicPath = join(process.cwd(), 'public', 'uploads');
+          const filePath = join(publicPath, filename);
+          
+          // Ensure the uploads directory exists (recursive: true creates all directories in the path)
           await mkdir(publicPath, { recursive: true });
+          
+          // Save the file
+          await writeFile(filePath, buffer);
+          
+          // Set the URL for the database
+          imageUrl = `/uploads/${filename}`;
+          console.log(`Image saved successfully at ${filePath}`);
         } catch (error) {
-          // Directory might already exist
+          console.error("Error saving image:", error);
+          // Don't throw the error, just log it and continue without updating the image
         }
-        
-        // Save the file
-        await writeFile(filePath, buffer);
-        imageUrl = `/uploads/${filename}`;
       }
 
       // Add form fields to update data
@@ -262,12 +275,13 @@ export async function PATCH(
       }
 
       // Handle mileage field - important for maintenance scheduling
-      const formMileage = formData.get('currentMileage');   
-      const oldMileage = motorcycle.currentMileage;
-
-      const body = await request.json();
-      if (body.currentMileage !== undefined) {
-        const newMileage = parseInt(body.currentMileage);
+      const currentMileageField = formData.get('currentMileage');   
+      if (currentMileageField) {
+        const oldMileage = motorcycle.currentMileage;
+        const newMileage = parseInt(currentMileageField.toString());
+        
+        // Update the mileage in the update data
+        updateData.currentMileage = newMileage;
         
         if (oldMileage !== newMileage) {
           // Check if there's a recent log (within last minute) to avoid duplicates
@@ -276,7 +290,7 @@ export async function PATCH(
               eq(mileageLogs.motorcycleId, id),
               eq(mileageLogs.newMileage, newMileage)
             ),
-            orderBy: [desc(mileageLogs.date)]
+            orderBy: (logs, { desc }) => [desc(logs.date)]
           });
           
           // Only create a new log if not a duplicate
@@ -312,9 +326,10 @@ export async function PATCH(
           });
         }
       }
+      
       // Handle date field
       const purchaseDate = formData.get('purchaseDate');
-      if (purchaseDate) {
+      if (purchaseDate && purchaseDate.toString().trim() !== '') {
         updateData.purchaseDate = new Date(purchaseDate.toString());
       }
 
@@ -324,59 +339,68 @@ export async function PATCH(
       }
     } else {
       // Handle regular JSON data (existing functionality)
-      const body = await request.json();
-      
-      updateData = {
-        ...updateData,
-        name: body.name ?? motorcycle.name,
-        make: body.make ?? motorcycle.make,
-        model: body.model ?? motorcycle.model,
-        year: body.year ? parseInt(body.year) : motorcycle.year,
-        vin: body.vin ?? motorcycle.vin,
-        color: body.color ?? motorcycle.color,
-        purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : motorcycle.purchaseDate,
-        notes: body.notes ?? motorcycle.notes,
-      };
-      
-      // Handle mileage update - important for maintenance scheduling
-      const oldMileage = motorcycle.currentMileage;
-      
-      if (body.currentMileage !== undefined) {
-        const newMileage = parseInt(body.currentMileage);
+      try {
+        const body = await request.json();
+        
+        updateData = {
+          ...updateData,
+          name: body.name ?? motorcycle.name,
+          make: body.make ?? motorcycle.make,
+          model: body.model ?? motorcycle.model,
+          year: body.year ? parseInt(body.year) : motorcycle.year,
+          vin: body.vin ?? motorcycle.vin,
+          color: body.color ?? motorcycle.color,
+          purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : motorcycle.purchaseDate,
+          notes: body.notes ?? motorcycle.notes,
+        };
+        
+        // Handle mileage update - important for maintenance scheduling
         const oldMileage = motorcycle.currentMileage;
         
-        if (oldMileage !== newMileage) {
-          // Log the mileage update
-          await db.insert(mileageLogs).values({
-            id: randomUUID(),
-            motorcycleId: id,
-            previousMileage: oldMileage,
-            newMileage: newMileage,
-            date: new Date(),
-            notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
-            createdAt: new Date()
-          });
+        if (body.currentMileage !== undefined) {
+          const newMileage = parseInt(body.currentMileage);
+          updateData.currentMileage = newMileage;
           
-          // Update maintenance tasks based on new mileage
-          await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
-          
-          // Trigger mileage_updated event - ensuring this runs every time mileage changes
-          await triggerEvent(session.user.id, "mileage_updated", {
-            motorcycle: {
-              id: motorcycle.id,
-              name: motorcycle.name,
-              make: motorcycle.make,
-              model: motorcycle.model,
-              year: motorcycle.year
-            },
-            previousMileage: oldMileage,
-            newMileage: newMileage,
-            units: process.env.DEFAULT_UNITS === 'metric' ? 'km' : 'mi'
-          });
+          if (oldMileage !== newMileage) {
+            // Log the mileage update
+            await db.insert(mileageLogs).values({
+              id: randomUUID(),
+              motorcycleId: id,
+              previousMileage: oldMileage,
+              newMileage: newMileage,
+              date: new Date(),
+              notes: `Updated mileage from ${oldMileage || 0} to ${newMileage}`,
+              createdAt: new Date()
+            });
+            
+            // Update maintenance tasks based on new mileage
+            await updateMaintenanceTasksAfterMileageChange(id, oldMileage, newMileage);
+            
+            // Trigger mileage_updated event - ensuring this runs every time mileage changes
+            await triggerEvent(session.user.id, "mileage_updated", {
+              motorcycle: {
+                id: motorcycle.id,
+                name: motorcycle.name,
+                make: motorcycle.make,
+                model: motorcycle.model,
+                year: motorcycle.year
+              },
+              previousMileage: oldMileage,
+              newMileage: newMileage,
+              units: process.env.DEFAULT_UNITS === 'metric' ? 'km' : 'mi'
+            });
+          }
         }
+      } catch (error) {
+        console.error("Error parsing JSON body:", error);
+        return NextResponse.json(
+          { error: "Invalid JSON in request body" },
+          { status: 400 }
+        );
       }
-
     }
+
+    console.log("Updating motorcycle with data:", { ...updateData, imageUrl: updateData.imageUrl ? "[Image URL Updated]" : "[No Change]" });
 
     // Update motorcycle
     const updatedMotorcycle = await db

@@ -17,6 +17,12 @@ export default withAuth(
     // Get the pathname of the request
     const pathname = req.nextUrl.pathname;
     
+    // Allow direct access to uploaded files
+    if (pathname.startsWith("/uploads/")) {
+      // Skip authentication for uploaded files
+      return NextResponse.next();
+    }
+    
     // Allow access to API routes needed for integrations
     if (
       pathname.startsWith("/api/user/integrations") ||
@@ -102,6 +108,11 @@ export default withAuth(
     },
     callbacks: {
       authorized: ({ token, req }) => {
+        // Always allow uploads directory
+        if (req.nextUrl.pathname.startsWith("/uploads/")) {
+          return true;
+        }
+        
         // Always allow API routes needed for integrations
         if (
           req.nextUrl.pathname.startsWith("/api/user/integrations") ||
@@ -144,10 +155,10 @@ export const config = {
     "/api/motorcycles/:path*",
     "/api/user/:path*",
     "/api/auth/:path*",
-    "/api/maintenance/:path*", // Added this to cover all maintenance endpoints
-    "/api/service-history/:path*", // Added this to cover all service history endpoints
-    "/uploads/:path*", // Added this to handle image caching
+    "/api/maintenance/:path*",
+    "/api/service-history/:path*",
+    "/api/uploads/:path*", // Changed to API uploads, not direct uploads
     // Prevent static/public files from triggering middleware
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|uploads|public).*)",
   ],
 };

@@ -378,17 +378,34 @@ export default function MotorcycleDetail() {
           <div className="p-6 md:flex">
             <div className="md:w-1/3 mb-4 md:mb-0 md:mr-6">
               <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                  {motorcycle.imageUrl ? (
+                {motorcycle.imageUrl ? (
                   <div className="relative w-full h-full">
                     <Image 
                       src={motorcycle.imageUrl}
                       alt={motorcycle.name}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
-                      className="object-cover cursor-pointer"
+                      className="object-cover"
                       priority={true}
-                      placeholder="blur"
-                      blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+                      onError={(e) => {
+                        // Handle image loading errors by showing a fallback
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const container = target.parentElement;
+                        if (container) {
+                          container.classList.add('image-error');
+                          container.innerHTML = `
+                            <div class="flex flex-col items-center justify-center h-full w-full">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-2">
+                                <path d="M17 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10z"></path>
+                                <circle cx="12" cy="9" r="3"></circle>
+                                <path d="M17 18H7l2.5-3.5a1 1 0 0 1 1.5 0l1 1.5 2-3a1 1 0 0 1 1.5 0l1.5 2"></path>
+                              </svg>
+                              <p class="text-gray-400">Image not available</p>
+                            </div>
+                          `;
+                        }
+                      }}
                     />
                   </div>
                 ) : (
@@ -418,7 +435,7 @@ export default function MotorcycleDetail() {
                   </button>
                   <button 
                     onClick={() => setShowOwnershipModal(true)}
-                    className={`px-3 py-1.5 ${
+                    className={`px-3 py-1.5 hidden ${
                       motorcycle.isOwned 
                         ? "bg-gray-100 text-gray-700" 
                         : "bg-blue-100 text-blue-700"

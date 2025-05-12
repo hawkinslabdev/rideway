@@ -38,6 +38,7 @@
     "react-csv": "^2.2.2",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
+    "react-swipeable": "^7.0.2",
     "shadcn-ui": "^0.9.5",
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7"

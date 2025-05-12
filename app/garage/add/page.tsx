@@ -53,12 +53,28 @@ export default function AddMotorcycle() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        setError("Invalid file type. Please upload a JPG, PNG, GIF or WebP image.");
+        return;
+      }
+      
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File is too large. Maximum size is 10MB.");
+        return;
+      }
+      
       setImageFile(file);
       
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
+      };
+      reader.onerror = () => {
+        setError("Failed to read the image file. Please try again.");
       };
       reader.readAsDataURL(file);
     }

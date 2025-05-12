@@ -43,12 +43,21 @@ const NavItem = ({ href, icon, label, badge = 0, alert = false }: {
   );
 };
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  setMobileOpen?: (isOpen: boolean) => void;
+}
+
+export default function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  
+  // Use the passed mobileOpen state if provided, otherwise use internal state
+  const [internalMobileOpen, setInternalMobileOpen] = useState(false);
+  const isMobileOpen = mobileOpen !== undefined ? mobileOpen : internalMobileOpen;
+  
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState(0);
@@ -58,7 +67,13 @@ export default function Sidebar() {
   const [showMenuHint, setShowMenuHint] = useState(false);
 
   // Close mobile menu on route changes
-  useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    if (setMobileOpen) {
+      setMobileOpen(false);
+    } else {
+      setInternalMobileOpen(false);
+    }
+  }, [pathname, setMobileOpen]);
   
   // Show menu hint for first-time users
   useEffect(() => {
@@ -81,12 +96,16 @@ export default function Sidebar() {
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
       if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
-        setMobileOpen(false);
+        if (setMobileOpen) {
+          setMobileOpen(false);
+        } else {
+          setInternalMobileOpen(false);
+        }
       }
     };
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
+  }, [setMobileOpen]);
 
   // Handle window resize to properly manage responsive behavior
   useEffect(() => {
@@ -98,14 +117,19 @@ export default function Sidebar() {
       const handleResize = () => {
         setWindowWidth(window.innerWidth);
         if (window.innerWidth >= 768) {
-          setMobileOpen(false); // Close mobile sidebar when switching to desktop
+          // Close mobile sidebar when switching to desktop
+          if (setMobileOpen) {
+            setMobileOpen(false);
+          } else {
+            setInternalMobileOpen(false);
+          }
         }
       };
       
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
     }
-  }, []);
+  }, [setMobileOpen]);
 
   // Fetch alert data when component mounts
   useEffect(() => {
@@ -148,7 +172,11 @@ export default function Sidebar() {
   
   // Toggle mobile menu and record that user has used it
   const toggleMobileMenu = () => {
-    setMobileOpen(!mobileOpen);
+    if (setMobileOpen) {
+      setMobileOpen(!isMobileOpen);
+    } else {
+      setInternalMobileOpen(!isMobileOpen);
+    }
     setShowMenuHint(false);
     
     // Record that user has opened menu before
@@ -169,12 +197,12 @@ export default function Sidebar() {
           <Bike className="mr-2" />
           <span className="flex items-center">
             Rideway
-            {showMenuHint && !mobileOpen && (
+            {showMenuHint && !isMobileOpen && (
               <span className="absolute -top-3 right-0 bg-blue-700 text-white text-xs px-2 py-1 rounded-full mobile-menu-hint">
                 Tap to open menu
               </span>
             )}
-            {mobileOpen && (
+            {isMobileOpen && (
               <span className="ml-1 text-blue-200 text-xs">
                 {/* We can show text here to be visible when the menu is open */}
               </span>
@@ -205,21 +233,21 @@ export default function Sidebar() {
             aria-label="Toggle Menu" 
             className="p-2 rounded-full bg-blue-800/30 hover:bg-blue-800/50"
           >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </header>
 
       {/* Overlay - Only visible when mobile sidebar is open */}
       <AnimatePresence>
-        {mobileOpen && (
+        {isMobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden"
-            onClick={() => setMobileOpen(false)}
+            onClick={() => setMobileOpen ? setMobileOpen(false) : setInternalMobileOpen(false)}
           />
         )}
       </AnimatePresence>
@@ -229,8 +257,8 @@ export default function Sidebar() {
         ref={sidebarRef}
         initial={{ x: typeof window !== "undefined" && window.innerWidth >= 768 ? 0 : -300 }}
         animate={{ 
-          x: mobileOpen || (windowWidth !== null && windowWidth >= 768) ? 0 : -300,
-          boxShadow: mobileOpen ? "5px 0 25px rgba(0,0,0,0.3)" : "none"
+          x: isMobileOpen || (windowWidth !== null && windowWidth >= 768) ? 0 : -300,
+          boxShadow: isMobileOpen ? "5px 0 25px rgba(0,0,0,0.3)" : "none"
         }}
         transition={{ 
           type: "spring", 
