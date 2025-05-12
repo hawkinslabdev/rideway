@@ -144,7 +144,7 @@ export const serviceRecords = sqliteTable("service_records", {
   cost: real("cost"),
   location: text("location"),
   notes: text("notes"),
-  receiptUrl: text("receipt_url"), // Add field for receipt images
+  receiptUrl: text("receipt_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });

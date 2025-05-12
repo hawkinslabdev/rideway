@@ -1087,6 +1087,23 @@ async function ensureServiceRecordsHasTaskId() {
     console.error("Error ensuring task_id column in service_records table:", error);
     // Don't throw, to avoid breaking the migration
   }
+
+  // Add column receipt_url 
+  try {
+    const columns = db.$client.prepare("PRAGMA table_info(service_records)").all();
+    const columnNames = columns.map((col: any) => col.name);
+    
+    if (!columnNames.includes("receipt_url")) {
+      console.log("Adding receipt_url column to service_records table");
+      db.$client.prepare("ALTER TABLE service_records ADD COLUMN receipt_url TEXT").run();
+      console.log("receipt_url column added successfully");
+    } else {
+      console.log("receipt_url column already exists in service_records table");
+    }
+  } catch (error) {
+    console.error("Error ensuring receipt_url column in service_records table:", error);
+    // Don't throw, to avoid breaking the migration
+  }
 }
 
 // Execute all migration steps in sequence

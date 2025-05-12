@@ -1,7 +1,6 @@
 // File: middleware.ts
 
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { withAuth } from "next-auth/middleware";
 
 export default withAuth(
@@ -22,7 +21,7 @@ export default withAuth(
       // Skip authentication for uploaded files
       return NextResponse.next();
     }
-    
+
     // Allow access to API routes needed for integrations
     if (
       pathname.startsWith("/api/user/integrations") ||
@@ -59,24 +58,7 @@ export default withAuth(
     if (req.method === 'GET') {
       // API routes with different caching strategies
       if (pathname.startsWith('/api/')) {
-        if (pathname.startsWith('/api/motorcycles') || 
-            pathname.startsWith('/api/maintenance') ||
-            pathname.startsWith('/api/service-history')) {
-          
-          // More specific path handling
-          if (pathname.includes('dashboard') || 
-              pathname.includes('/activity') || 
-              pathname.includes('/user')) {
-            // Short cache for dynamic data
-            response.headers.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=60');
-          } else if (pathname.match(/\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)) {
-            // Medium cache for specific item data (like /motorcycles/123)
-            response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=600');
-          } else {
-            // Longer cache for more static data
-            response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=3600');
-          }
-        } else if (pathname.startsWith('/api/health')) {
+        if (pathname.startsWith('/api/health')) {
           // Health checks can be cached briefly
           response.headers.set('Cache-Control', 'public, max-age=30');
         } else {
@@ -108,12 +90,7 @@ export default withAuth(
       signIn: "/auth/signin",
     },
     callbacks: {
-      authorized: ({ token, req }) => {
-        // Always allow uploads directory
-        if (req.nextUrl.pathname.startsWith("/uploads/")) {
-          return true;
-        }
-        
+      authorized: ({ token, req }) => {       
         // Always allow API routes needed for integrations
         if (
           req.nextUrl.pathname.startsWith("/api/user/integrations") ||
@@ -158,8 +135,6 @@ export const config = {
     "/api/auth/:path*",
     "/api/maintenance/:path*",
     "/api/service-history/:path*",
-    "/api/uploads/:path*", // Changed to API uploads, not direct uploads
-    // Prevent static/public files from triggering middleware
     "/((?!_next/static|_next/image|favicon.ico|uploads|public).*)",
   ],
 };
