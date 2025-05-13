@@ -13,6 +13,8 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=your-secret-key-change-me-in-production
       - SQLITE_DB_PATH=/app/data/moto_maintain.db      
+      - UPLOADS_DIR=/app/public/uploads
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
     restart: unless-stopped
 
 volumes:

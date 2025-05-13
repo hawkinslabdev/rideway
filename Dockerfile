@@ -59,7 +59,6 @@ RUN echo '#!/bin/sh' > ./start.sh && \
     echo 'echo "Running database migrations..."' >> ./start.sh && \
     echo 'mkdir -p /app/data /app/public/uploads' >> ./start.sh && \
     echo 'chmod -R 777 /app/data /app/public/uploads' >> ./start.sh && \
-    echo 'chown -R node:node /app/data /app/public/uploads' >> ./start.sh && \
     echo 'ls -la /app/public/' >> ./start.sh && \
     echo 'node -r esbuild-register ./app/lib/db/migrate.ts || { echo "Migration failed with status $?"; exit 1; }' >> ./start.sh && \
     echo 'echo "Starting Next.js application..."' >> ./start.sh && \

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Save, Camera, Archive, Trash2, AlertCircle } from "lucide-react";
 import ClientLayout from "@/app/components/ClientLayout";
 import { useSettings } from "@/app/contexts/SettingsContext";
+import DockerImageAdapter from "@/app/components/DockerImageAdapter";
 
 export default function EditMotorcycle({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -53,6 +54,34 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
     if (!motorcycleId) return;
     fetchMotorcycle();
   }, [motorcycleId]);
+
+const uploadImage = async (file: File): Promise<string | null> => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    // Use the dedicated image upload API
+    const response = await fetch('/api/uploads/image', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      // Parse error details if available
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.error || 'Failed to upload image';
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    return data.imageUrl;
+  } catch (error) {
+    console.error('Image upload error:', error);
+    setError(error instanceof Error ? error.message : 'Failed to upload image');
+    return null;
+  }
+};
+
 
   const fetchMotorcycle = async () => {
     try {
@@ -171,24 +200,39 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
     setError("");
 
     try {
-      // Create FormData to handle file upload
-      const submitData = new FormData();
+      // First handle image upload if there's a new image
+      let finalImageUrl = formData.imageUrl;
       
-      // Add all form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'imageUrl' || !imageFile) { // Don't send imageUrl if there's a new file
-          submitData.append(key, value.toString());
-        }
-      });
-      
-      // Add image file if present
       if (imageFile) {
-        submitData.append('image', imageFile);
+        // Upload the image separately
+        const uploadedImageUrl = await uploadImage(imageFile);
+        if (!uploadedImageUrl) {
+          // Image upload failed, but allow the form to continue if user wants
+          if (!confirm('Image upload failed. Do you want to continue saving other changes?')) {
+            setLoading(false);
+            return;
+          }
+        } else {
+          finalImageUrl = uploadedImageUrl;
+        }
       }
+      
+      // Create data to submit (without the image file)
+      const submitData = {
+        ...formData,
+        imageUrl: finalImageUrl,
+        // Parse numeric values
+        year: parseInt(formData.year.toString()),
+        currentMileage: formData.currentMileage ? parseInt(formData.currentMileage) : null,
+      };
 
+      // Submit the motorcycle data as JSON (not FormData)
       const response = await fetch(`/api/motorcycles/${motorcycleId}`, {
         method: "PATCH",
-        body: submitData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
@@ -197,7 +241,7 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
 
       router.push(`/garage/${motorcycleId}`);
     } catch (err) {
-      setError("Failed to update motorcycle. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to update motorcycle. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -272,37 +316,37 @@ export default function EditMotorcycle({ params }: { params: Promise<{ id: strin
 
               <div className="p-6">
                 <div className="md:flex md:space-x-8">
-                  {/* Left column - Photo upload */}
+                   {/* Left column - Photo upload - REPLACE THIS SECTION */}
                   <div className="md:w-1/3 mb-6 md:mb-0">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Motorcycle Photo
                     </label>
                     <div className="mt-1 border-2 border-gray-300 border-dashed rounded-lg overflow-hidden">
+                      {/* Use DockerImageAdapter for previewing the existing image */}
                       <div className="aspect-square w-full relative flex items-center justify-center bg-gray-50">
                         {imagePreview ? (
-                          <img 
-                            src={imagePreview} 
-                            alt="Preview" 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Handle image loading errors
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              e.currentTarget.parentElement?.classList.add('image-error');
-                              // Optionally show error message or fallback icon
-                              const errorDiv = document.createElement('div');
-                              errorDiv.className = 'flex flex-col items-center justify-center';
-                              errorDiv.innerHTML = `
-                                <Camera className="h-12 w-12 text-gray-400" />
-                                <p class="text-xs text-gray-500 mt-2">Image failed to load</p>
-                              `;
-                              e.currentTarget.parentElement?.appendChild(errorDiv);
-                            }}
-                          />
+                          imagePreview.startsWith('data:') ? (
+                            // For local file preview (from FileReader)
+                            <img 
+                              src={imagePreview} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            // For server-stored images, use DockerImageAdapter
+                            <DockerImageAdapter 
+                              src={imagePreview} 
+                              alt="Motorcycle Preview" 
+                              className="w-full h-full object-cover"
+                              fallbackText="Image not available"
+                            />
+                          )
                         ) : (
                           <Camera className="h-12 w-12 text-gray-400" />
                         )}
                       </div>
+                      
+                      {/* File upload controls - no changes here */}
                       <div className="p-3 bg-gray-50 border-t border-gray-200">
                         <div className="flex justify-center">
                           <label className="cursor-pointer bg-white rounded-md px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 hover:bg-blue-50">

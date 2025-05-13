@@ -16,10 +16,13 @@ export default withAuth(
     // Get the pathname of the request
     const pathname = req.nextUrl.pathname;
     
-    // Allow direct access to uploaded files
+    // CRITICAL CHANGE: Allow direct access to uploaded files
+    // This is important for proper image loading
     if (pathname.startsWith("/uploads/")) {
-      // Skip authentication for uploaded files
-      return NextResponse.next();
+      // Skip authentication for uploaded files and set correct cache headers
+      const response = NextResponse.next();
+      response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      return response;
     }
 
     // Allow access to API routes needed for integrations
@@ -99,6 +102,11 @@ export default withAuth(
           return true;
         }
         
+        // CRITICAL: Direct access to uploads folder should be allowed
+        if (req.nextUrl.pathname.startsWith("/uploads/")) {
+          return true;
+        }
+        
         // Check if this is a password reset page with token
         if (req.nextUrl.pathname.startsWith("/auth/reset-password/")) {
           return true;
@@ -135,6 +143,7 @@ export const config = {
     "/api/auth/:path*",
     "/api/maintenance/:path*",
     "/api/service-history/:path*",
-    "/((?!_next/static|_next/image|favicon.ico|uploads|public).*)",
+    "/uploads/:path*", // Add matcher for uploads
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

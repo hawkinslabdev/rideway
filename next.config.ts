@@ -21,7 +21,11 @@ const nextConfig: NextConfig = {
 
   // Enhanced image handling with cache directives
   images: {
-    unoptimized: process.env.NODE_ENV !== 'production',
+    // Set to true in production and development to avoid image optimization issues
+    unoptimized: true,
+    // Add the server domain as a valid domain for local images
+    domains: ['localhost'],
+    // Add the path pattern
     remotePatterns: [
       {
         protocol: 'http',
@@ -36,7 +40,7 @@ const nextConfig: NextConfig = {
     ],
     // Enable image caching - added this configuration
     minimumCacheTTL: 86400, // cache for a day
-    formats: ['image/webp'], // prefer WebP for better compression
+    formats: ['image/webp', 'image/avif'], // Only use valid Next.js format types
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048], // responsive image sizes
     imageSizes: [16, 32, 64, 96, 128, 256], // icon sizes
   },
